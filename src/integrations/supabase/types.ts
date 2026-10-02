@@ -14,13 +14,171 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      atendimentos: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          data: string
+          forma_pagamento: string
+          id: string
+          observacoes: string | null
+          percentual_ana: number
+          servico_id: string | null
+          taxa_percentual: number
+          user_id: string
+          valor_bruto: number
+          valor_liquido: number
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          data?: string
+          forma_pagamento: string
+          id?: string
+          observacoes?: string | null
+          percentual_ana?: number
+          servico_id?: string | null
+          taxa_percentual?: number
+          user_id?: string
+          valor_bruto?: number
+          valor_liquido?: number
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          data?: string
+          forma_pagamento?: string
+          id?: string
+          observacoes?: string | null
+          percentual_ana?: number
+          servico_id?: string | null
+          taxa_percentual?: number
+          user_id?: string
+          valor_bruto?: number
+          valor_liquido?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atendimentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atendimentos_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clientes: {
+        Row: {
+          alergias: string | null
+          consentimento_data: string | null
+          consentimento_lgpd: boolean
+          created_at: string
+          data_nascimento: string | null
+          diabetes_circulacao: boolean
+          gestante: boolean
+          id: string
+          medicamentos: string | null
+          nome: string
+          observacoes: string | null
+          problema_unhas: string | null
+          telefone: string | null
+          user_id: string
+        }
+        Insert: {
+          alergias?: string | null
+          consentimento_data?: string | null
+          consentimento_lgpd?: boolean
+          created_at?: string
+          data_nascimento?: string | null
+          diabetes_circulacao?: boolean
+          gestante?: boolean
+          id?: string
+          medicamentos?: string | null
+          nome: string
+          observacoes?: string | null
+          problema_unhas?: string | null
+          telefone?: string | null
+          user_id?: string
+        }
+        Update: {
+          alergias?: string | null
+          consentimento_data?: string | null
+          consentimento_lgpd?: boolean
+          created_at?: string
+          data_nascimento?: string | null
+          diabetes_circulacao?: boolean
+          gestante?: boolean
+          id?: string
+          medicamentos?: string | null
+          nome?: string
+          observacoes?: string | null
+          problema_unhas?: string | null
+          telefone?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      configuracoes: {
+        Row: {
+          nome_dona: string
+          percentual_ana: number
+          taxa_credito: number
+          taxa_debito: number
+          user_id: string
+        }
+        Insert: {
+          nome_dona?: string
+          percentual_ana?: number
+          taxa_credito?: number
+          taxa_debito?: number
+          user_id?: string
+        }
+        Update: {
+          nome_dona?: string
+          percentual_ana?: number
+          taxa_credito?: number
+          taxa_debito?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      servicos: {
+        Row: {
+          ativo: boolean
+          id: string
+          nome: string
+          preco_padrao: number
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          id?: string
+          nome: string
+          preco_padrao?: number
+          user_id?: string
+        }
+        Update: {
+          ativo?: boolean
+          id?: string
+          nome?: string
+          preco_padrao?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      garantir_setup: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
