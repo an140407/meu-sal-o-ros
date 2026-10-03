@@ -31,7 +31,14 @@ function AuthPage() {
     try {
       if (modo === "entrar") {
         const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-        if (error) throw error;
+        if (error) {
+          toast.error(
+            error.code === "email_not_confirmed"
+              ? "E-mail ainda não confirmado. Confira sua caixa de entrada."
+              : "E-mail ou senha inválidos.",
+          );
+          return;
+        }
         navigate({ to: "/atendimentos" });
       } else {
         const { data, error } = await supabase.auth.signUp({
