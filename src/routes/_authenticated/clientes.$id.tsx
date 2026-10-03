@@ -48,7 +48,14 @@ function Page() {
 
   async function excluir() {
     const { error } = await supabase.from("clientes").delete().eq("id", id);
-    if (error) return toast.error("Não foi possível excluir.");
+    if (error) {
+      setConfirmDel(false);
+      return toast.error(
+        error.code === "23503"
+          ? "Esta cliente tem atendimentos e não pode ser excluída."
+          : "Não foi possível excluir.",
+      );
+    }
     await qc.invalidateQueries();
     toast.success("Cliente excluída");
     navigate({ to: "/clientes" });
@@ -99,7 +106,7 @@ function Page() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir {c.nome}?</AlertDialogTitle>
-            <AlertDialogDescription>Os atendimentos desta cliente também serão excluídos.</AlertDialogDescription>
+            <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
