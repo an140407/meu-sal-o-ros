@@ -65,9 +65,9 @@ export function AtendimentoForm({
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     const v = Number(valor.replace(",", "."));
-    if (!clienteId) return toast.error("Escolha a cliente.");
-    if (!servicoId) return toast.error("Escolha o serviço.");
-    if (!Number.isFinite(v) || v < 0) return toast.error("Valor inválido.");
+    if (!clienteId) return void toast.error("Escolha a cliente.");
+    if (!servicoId) return void toast.error("Escolha o serviço.");
+    if (!Number.isFinite(v) || v < 0) return void toast.error("Valor inválido.");
     setSaving(true);
     const payload = {
       cliente_id: clienteId, servico_id: servicoId, valor_bruto: v, data,
@@ -77,7 +77,7 @@ export function AtendimentoForm({
       ? await supabase.from("atendimentos").update(payload).eq("id", editing.id)
       : await supabase.from("atendimentos").insert(payload);
     setSaving(false);
-    if (error) return toast.error("Não foi possível salvar.");
+    if (error) return void toast.error("Não foi possível salvar.");
     toast.success(editing ? "Atendimento atualizado" : "Atendimento registrado");
     refresh();
     onOpenChange(false);
@@ -86,7 +86,7 @@ export function AtendimentoForm({
   async function excluir() {
     if (!editing) return;
     const { error } = await supabase.from("atendimentos").delete().eq("id", editing.id);
-    if (error) return toast.error("Não foi possível excluir.");
+    if (error) return void toast.error("Não foi possível excluir.");
     toast.success("Atendimento excluído");
     refresh();
     setConfirmDel(false);

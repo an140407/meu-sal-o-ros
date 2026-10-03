@@ -149,6 +149,36 @@ export type Database = {
         }
         Relationships: []
       }
+      repasses: {
+        Row: {
+          created_at: string | null
+          data_recebimento: string
+          id: string
+          mes_referencia: string
+          observacao: string | null
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string | null
+          data_recebimento?: string
+          id?: string
+          mes_referencia: string
+          observacao?: string | null
+          user_id?: string
+          valor: number
+        }
+        Update: {
+          created_at?: string | null
+          data_recebimento?: string
+          id?: string
+          mes_referencia?: string
+          observacao?: string | null
+          user_id?: string
+          valor?: number
+        }
+        Relationships: []
+      }
       servicos: {
         Row: {
           ativo: boolean
