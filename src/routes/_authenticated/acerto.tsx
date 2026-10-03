@@ -1,0 +1,228 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Copy, Plus, Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { PageHeader, Empty } from "@/components/app/ui-bits";
+import { useAtendimentosMes, useConfig, useRepasses, type Repasse } from "@/lib/data";
+import { brl, dataBR, hojeISO, mesAno } from "@/lib/format";
+
+export const Route = createFileRoute("/_authenticated/acerto")({
+  head: () => ({
+    meta: [
+      { title: "Acerto do mês — Caderno da Nail" },
+      { name: "description", content: "Divisão do mês, repasses e saldo a receber." },
+      { property: "og:title", content: "Acerto do mês — Caderno da Nail" },
+      { property: "og:description", content: "Divisão do mês, repasses e saldo a receber." },
+    ],
+  }),
+  component: Page,
+});
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+function Page() {
+  const [mes, setMes] = useState(() => hojeISO().slice(0, 7));
+  const { data: atends = [], isLoading } = useAtendimentosMes(mes);
+  const { data: repasses = [] } = useRepasses(mes);
+  const { data: cfg } = useConfig();
+  const dona = cfg?.nome_dona ?? "Simone";
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Repasse | null>(null);
+
+  const bruto = r2(atends.reduce((s, a) => s + Number(a.valor_bruto), 0));
+  const liquido = r2(atends.reduce((s, a) => s + Number(a.valor_liquido), 0));
+  const taxas = r2(bruto - liquido);
+  const ana = r2(atends.reduce((s, a) => s + (Number(a.valor_liquido) * Number(a.percentual_ana)) / 100, 0));
+  const parteDona = r2(liquido - ana);
+  const repassado = r2(repasses.reduce((s, r) => s + Number(r.valor), 0));
+  const saldo = r2(ana - repassado);
+
+  async function copiar() {
+    const linhas = [
+      `Acerto ${mesAno(mes)}`,
+      "",
+      ...atends.map((a) => `${dataBR(a.data)} - ${a.clientes?.nome ?? "—"} - ${a.servicos?.nome ?? "Serviço"} - ${brl(a.valor_bruto)}`),
+      "",
+      `Total bruto: ${brl(bruto)}`,
+      `Taxas: ${brl(taxas)}`,
+      `Total líquido: ${brl(liquido)}`,
+      `Parte da Ana: ${brl(ana)}`,
+      `Parte da ${dona}: ${brl(parteDona)}`,
+      `Repassado: ${brl(repassado)}`,
+      `Saldo a receber: ${brl(saldo)}`,
+    ];
+    try {
+      await navigator.clipboard.writeText(linhas.join("\n"));
+      toast.success("Resumo copiado. É só colar no WhatsApp.");
+    } catch {
+      toast.error("Não foi possível copiar.");
+    }
+  }
+
+  const linha = (label: string, valor: number, forte = false) => (
+    <div className="flex justify-between py-1.5">
+      <span className={forte ? "font-semibold" : "text-muted-foreground"}>{label}</span>
+      <span className={forte ? "font-semibold" : ""}>{brl(valor)}</span>
+    </div>
+  );
+
+  return (
+    <>
+      <PageHeader title="Acerto" />
+      <div className="space-y-5 px-5">
+        <Input type="month" className="h-12 text-base" value={mes} onChange={(e) => e.target.value && setMes(e.target.value)} aria-label="Mês" />
+
+        <section className="rounded-2xl bg-rose-gradient p-4">
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="text-xl">{mesAno(mes)}</h2>
+            <span className="text-sm text-muted-foreground">{atends.length} atend.</span>
+          </div>
+          {isLoading ? <p className="text-muted-foreground">Carregando...</p> : (
+            <div className="divide-y divide-border">
+              <div>
+                {linha("Total bruto", bruto)}
+                {linha("Taxas", taxas)}
+                {linha("Total líquido", liquido, true)}
+              </div>
+              <div>
+                {linha("Parte da Ana", ana, true)}
+                {linha(`Parte da ${dona}`, parteDona)}
+              </div>
+              <div>
+                {linha("Repassado", repassado)}
+                {linha("Saldo a receber", saldo, true)}
+              </div>
+            </div>
+          )}
+        </section>
+
+        <Button size="xl" variant="secondary" onClick={copiar}><Copy /> Copiar resumo</Button>
+
+        <section className="space-y-3">
+          <h2 className="text-xl">Repasses</h2>
+          <Button size="xl" onClick={() => { setEditing(null); setOpen(true); }}><Plus /> Registrar repasse</Button>
+          {repasses.length === 0 ? <Empty>Nenhum repasse neste mês.</Empty> : (
+            <ul className="divide-y overflow-hidden rounded-2xl border bg-card">
+              {repasses.map((r) => (
+                <li key={r.id}>
+                  <button onClick={() => { setEditing(r); setOpen(true); }} className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left active:bg-muted">
+                    <div className="min-w-0">
+                      <div className="font-semibold">{dataBR(r.data_recebimento)}</div>
+                      {r.observacao && <div className="truncate text-sm text-muted-foreground">{r.observacao}</div>}
+                    </div>
+                    <div className="shrink-0 font-semibold">{brl(r.valor)}</div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+      <RepasseForm open={open} onOpenChange={setOpen} editing={editing} mes={mes} />
+    </>
+  );
+}
+
+function RepasseForm({
+  open, onOpenChange, editing, mes,
+}: { open: boolean; onOpenChange: (o: boolean) => void; editing: Repasse | null; mes: string }) {
+  const qc = useQueryClient();
+  const [valor, setValor] = useState("");
+  const [data, setData] = useState(hojeISO());
+  const [obs, setObs] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setValor(editing ? String(editing.valor) : "");
+    setData(editing?.data_recebimento ?? hojeISO());
+    setObs(editing?.observacao ?? "");
+  }, [open, editing]);
+
+  const refresh = () => qc.invalidateQueries({ queryKey: ["repasses"] });
+
+  async function salvar(e: React.FormEvent) {
+    e.preventDefault();
+    const v = Number(valor.replace(",", "."));
+    if (!Number.isFinite(v) || v <= 0) return void toast.error("Informe um valor válido.");
+    if (!data) return void toast.error("Informe a data.");
+    setSaving(true);
+    const payload = { valor: r2(v), data_recebimento: data, observacao: obs.trim().slice(0, 500) || null };
+    const { error } = editing
+      ? await supabase.from("repasses").update(payload).eq("id", editing.id)
+      : await supabase.from("repasses").insert({ ...payload, mes_referencia: mes });
+    setSaving(false);
+    if (error) return void toast.error("Não foi possível salvar.");
+    toast.success(editing ? "Repasse atualizado" : "Repasse registrado");
+    refresh();
+    onOpenChange(false);
+  }
+
+  async function excluir() {
+    if (!editing) return;
+    const { error } = await supabase.from("repasses").delete().eq("id", editing.id);
+    if (error) return void toast.error("Não foi possível excluir.");
+    toast.success("Repasse excluído");
+    refresh();
+    setConfirmDel(false);
+    onOpenChange(false);
+  }
+
+  return (
+    <>
+      <Drawer open={open} onOpenChange={onOpenChange}>
+        <DrawerContent className="max-h-[92vh]">
+          <DrawerHeader className="text-left">
+            <DrawerTitle className="font-display text-2xl">{editing ? "Editar repasse" : "Registrar repasse"}</DrawerTitle>
+          </DrawerHeader>
+          <form onSubmit={salvar} className="space-y-4 overflow-y-auto px-4 pb-8">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Valor (R$)</Label>
+                <Input className="h-12 text-base" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Data</Label>
+                <Input className="h-12 text-base" type="date" required value={data} onChange={(e) => setData(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Observação</Label>
+              <Textarea value={obs} onChange={(e) => setObs(e.target.value)} maxLength={500} className="text-base" />
+            </div>
+            <Button type="submit" size="xl" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+            {editing && (
+              <Button type="button" variant="ghost" className="h-12 w-full text-destructive" onClick={() => setConfirmDel(true)}>
+                <Trash2 /> Excluir repasse
+              </Button>
+            )}
+          </form>
+        </DrawerContent>
+      </Drawer>
+      <AlertDialog open={confirmDel} onOpenChange={setConfirmDel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir repasse?</AlertDialogTitle>
+            <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={excluir}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
