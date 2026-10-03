@@ -43,14 +43,14 @@ function Page() {
 
   async function salvarCfg(e: React.FormEvent) {
     e.preventDefault();
-    const vals = [num(f.percentual_ana), num(f.taxa_debito), num(f.taxa_credito)];
-    if (vals.some((v) => !Number.isFinite(v) || v < 0 || v > 100)) return toast.error("Use percentuais entre 0 e 100.");
+    const vals: [number, number, number] = [num(f.percentual_ana), num(f.taxa_debito), num(f.taxa_credito)];
+    if (vals.some((v) => !Number.isFinite(v) || v < 0 || v > 100)) return void toast.error("Use percentuais entre 0 e 100.");
     if (!cfg) return;
     const { error } = await supabase.from("configuracoes").update({
       percentual_ana: vals[0], taxa_debito: vals[1], taxa_credito: vals[2],
       nome_dona: f.nome_dona.trim().slice(0, 60) || "Simone",
     }).eq("user_id", cfg.user_id);
-    if (error) return toast.error("Não foi possível salvar.");
+    if (error) return void toast.error("Não foi possível salvar.");
     qc.invalidateQueries({ queryKey: ["config"] });
     toast.success("Ajustes salvos. Valem para os próximos atendimentos.");
   }
@@ -58,16 +58,16 @@ function Page() {
   async function addServico(e: React.FormEvent) {
     e.preventDefault();
     const preco = num(novo.preco || "0");
-    if (!novo.nome.trim() || !Number.isFinite(preco) || preco < 0) return toast.error("Preencha nome e preço.");
+    if (!novo.nome.trim() || !Number.isFinite(preco) || preco < 0) return void toast.error("Preencha nome e preço.");
     const { error } = await supabase.from("servicos").insert({ nome: novo.nome.trim().slice(0, 80), preco_padrao: preco });
-    if (error) return toast.error("Não foi possível adicionar.");
+    if (error) return void toast.error("Não foi possível adicionar.");
     setNovo({ nome: "", preco: "" });
     qc.invalidateQueries({ queryKey: ["servicos"] });
   }
 
   async function updServico(id: string, patch: { ativo?: boolean; preco_padrao?: number }) {
     const { error } = await supabase.from("servicos").update(patch).eq("id", id);
-    if (error) return toast.error("Não foi possível salvar.");
+    if (error) return void toast.error("Não foi possível salvar.");
     qc.invalidateQueries({ queryKey: ["servicos"] });
   }
 

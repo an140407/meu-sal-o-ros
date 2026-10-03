@@ -50,7 +50,7 @@ function Page() {
     const { error } = await supabase.from("clientes").delete().eq("id", id);
     if (error) {
       setConfirmDel(false);
-      return toast.error(
+      return void toast.error(
         error.code === "23503"
           ? "Esta cliente tem atendimentos e não pode ser excluída."
           : "Não foi possível excluir.",
