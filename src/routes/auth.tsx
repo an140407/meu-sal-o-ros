@@ -89,7 +89,7 @@ function AuthPage() {
     <main className="min-h-screen bg-rose-gradient flex flex-col justify-center px-6 py-10">
       <div className="mx-auto w-full max-w-sm">
         <h1 className="text-4xl text-foreground">Lunula</h1>
-        <p className="mt-2 text-muted-foreground">Clientes e atendimentos, num só lugar.</p>
+        <p className="mt-2 text-muted-foreground">Agenda, clientes e acerto num só lugar.</p>
         <div className="mt-8 space-y-4 rounded-3xl bg-card p-6 shadow-soft">
           <Button type="button" size="xl" onClick={entrarGoogle} disabled={googleLoading}>
             <GoogleIcon /> {googleLoading ? "Aguarde..." : "Continuar com o Google"}
