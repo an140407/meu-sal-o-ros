@@ -164,7 +164,7 @@ export function AgendaForm({
               {novoCliente ? "Nova cliente" : editing ? "Editar agendamento" : "Agendar"}
             </DrawerTitle>
           </DrawerHeader>
-          <div className="overflow-y-auto px-4 pb-8">
+          <div className="overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
             {novoCliente ? (
               <div className="space-y-3">
                 <ClienteForm

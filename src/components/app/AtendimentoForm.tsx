@@ -107,7 +107,7 @@ export function AtendimentoForm({
               {novoCliente ? "Nova cliente" : editing ? "Editar atendimento" : "Novo atendimento"}
             </DrawerTitle>
           </DrawerHeader>
-          <div className="overflow-y-auto px-4 pb-8">
+          <div className="overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
             {novoCliente ? (
               <div className="space-y-3">
                 <ClienteForm

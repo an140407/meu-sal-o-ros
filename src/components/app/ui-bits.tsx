@@ -1,9 +1,17 @@
 import type { ReactNode, SelectHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
-export function PageHeader({ title, children }: { title: string; children?: ReactNode }) {
+export function PageHeader({
+  title, children, voltar,
+}: {
+  title: string;
+  children?: ReactNode;
+  /** Link ou botão de voltar, mostrado acima do título. */
+  voltar?: ReactNode;
+}) {
   return (
-    <header className="sticky top-0 z-30 bg-background/95 px-5 pb-3 pt-6 backdrop-blur">
+    <header className="sticky top-0 z-30 bg-background/95 px-5 pb-3 pt-[max(1.5rem,env(safe-area-inset-top))] backdrop-blur">
+      {voltar && <div className="mb-2">{voltar}</div>}
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-3xl text-foreground">{title}</h1>
         {children}

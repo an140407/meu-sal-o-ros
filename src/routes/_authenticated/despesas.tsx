@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Empty } from "@/components/app/ui-bits";
+import { Empty, PageHeader } from "@/components/app/ui-bits";
 import { useDespesas, type Despesa } from "@/lib/data";
 import { CATEGORIAS_DESPESA, SEM_CATEGORIA, resumoDespesas } from "@/lib/despesas";
 import { brl, buscaMes, dataBR, hojeISO, mesAno } from "@/lib/format";
@@ -42,13 +42,15 @@ function Page() {
 
   return (
     <>
-      <header className="px-5 pb-3 pt-6">
-        {/* Sempre volta para o Acerto no mês escolhido aqui (sem usar o histórico). */}
-        <Link to="/acerto" search={{ mes }} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-          <ArrowLeft className="size-4" /> Acerto
-        </Link>
-        <h1 className="mt-2 text-3xl text-foreground">Despesas</h1>
-      </header>
+      <PageHeader
+        title="Despesas"
+        voltar={
+          // Sempre volta para o Acerto no mês escolhido aqui (sem usar o histórico).
+          <Link to="/acerto" search={{ mes }} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+            <ArrowLeft className="size-4" /> Acerto
+          </Link>
+        }
+      />
       <div className="space-y-5 px-5">
         <Input
           type="month"
@@ -171,7 +173,7 @@ function DespesaForm({
           <DrawerHeader className="text-left">
             <DrawerTitle className="font-display text-2xl">{editing ? "Editar despesa" : "Registrar despesa"}</DrawerTitle>
           </DrawerHeader>
-          <form onSubmit={salvar} className="space-y-4 overflow-y-auto px-4 pb-8">
+          <form onSubmit={salvar} className="space-y-4 overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <div className="space-y-2">
               <Label>Descrição</Label>
               <Input className="h-12 text-base" required maxLength={200} value={descricao} onChange={(e) => setDescricao(e.target.value)} />

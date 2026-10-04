@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig,
 } from "@/components/ui/chart";
-import { Empty } from "@/components/app/ui-bits";
+import { Empty, PageHeader } from "@/components/app/ui-bits";
 import { Voltar } from "@/components/app/Voltar";
 import { proximoMes, useAtendimentosPeriodo } from "@/lib/data";
 import { estatisticas, mesCurto, mesesPeriodo, type Ranking } from "@/lib/estatisticas";
@@ -45,10 +45,7 @@ function Page() {
 
   return (
     <>
-      <header className="px-5 pb-3 pt-6">
-        <Voltar label="Voltar" fallback={() => navigate({ to: "/acerto" })} />
-        <h1 className="mt-2 text-3xl text-foreground">Estatísticas</h1>
-      </header>
+      <PageHeader title="Estatísticas" voltar={<Voltar label="Voltar" fallback={() => navigate({ to: "/acerto" })} />} />
       <div className="space-y-5 px-5 pb-6">
         <div className="grid grid-cols-3 gap-2">
           {PERIODOS.map((p) => (

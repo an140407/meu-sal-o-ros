@@ -1,26 +1,34 @@
-import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { CalendarDays, Sparkles, Users, Settings, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: "/auth" });
-    return { user: data.user };
+    // Sessão local (sem ida ao servidor); o acesso aos dados continua protegido por RLS.
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) throw redirect({ to: "/auth" });
+    return { user: data.session.user };
   },
   component: Layout,
 });
 
 const tabs = [
   { to: "/agenda", label: "Agenda", icon: CalendarDays },
-  { to: "/atendimentos", label: "Atendimentos", icon: Sparkles },
+  { to: "/atendimentos", label: "Histórico", icon: Sparkles },
   { to: "/clientes", label: "Clientes", icon: Users },
-  { to: "/acerto", label: "Acerto", icon: Wallet },
+  { to: "/acerto", label: "Acerto", icon: Wallet, tambem: ["/despesas", "/estatisticas"] },
   { to: "/ajustes", label: "Ajustes", icon: Settings },
 ] as const;
 
+type Tab = (typeof tabs)[number];
+
 function Layout() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // Ativa na própria rota, nas filhas (/clientes/$id) e nas telas ligadas (Acerto → Despesas, Estatísticas).
+  const ativa = (t: Tab) =>
+    [t.to, ...("tambem" in t ? t.tambem : [])].some((p) => pathname === p || pathname.startsWith(`${p}/`));
   return (
     <div className="mx-auto min-h-screen max-w-lg pb-28">
       <Outlet />
@@ -30,8 +38,11 @@ function Layout() {
             <Link
               key={t.to}
               to={t.to}
-              className="flex flex-col items-center gap-1 py-3 text-xs font-medium text-muted-foreground"
-              activeProps={{ className: "text-primary" }}
+              aria-current={ativa(t) ? "page" : undefined}
+              className={cn(
+                "flex flex-col items-center gap-1 py-3 text-xs font-medium",
+                ativa(t) ? "text-primary" : "text-muted-foreground",
+              )}
             >
               <t.icon className="size-6" />
               {t.label}

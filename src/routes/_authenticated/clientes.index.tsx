@@ -82,7 +82,7 @@ function Page() {
       <Drawer open={open} onOpenChange={setOpen}>
         <DrawerContent className="max-h-[92vh]">
           <DrawerHeader className="text-left"><DrawerTitle className="font-display text-2xl">Nova cliente</DrawerTitle></DrawerHeader>
-          <div className="overflow-y-auto px-4 pb-8">
+          <div className="overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <ClienteForm
               initial={emptyCliente()}
               submitLabel="Cadastrar"

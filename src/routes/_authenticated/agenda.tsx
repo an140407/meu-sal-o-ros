@@ -301,7 +301,7 @@ function Page() {
       )}
 
       <Drawer open={!!acoes} onOpenChange={(o) => !o && setAcoes(null)}>
-        <DrawerContent>
+        <DrawerContent className="max-h-[92vh]">
           {acoes && (
             <>
               <DrawerHeader className="text-left">
@@ -310,7 +310,7 @@ function Page() {
                   {diaPorExtenso(acoes.data)} · {intervalo(acoes)} · {acoes.servicos?.nome ?? "Serviço"} · {brl(acoes.valor_bruto)}
                 </DrawerDescription>
               </DrawerHeader>
-              <div className="space-y-3 px-4 pb-8">
+              <div className="space-y-3 overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
                 {acoes.status === "agendado" && <AvisoSaude cliente={clientes.find((c) => c.id === acoes.cliente_id)} />}
                 {acoes.status === "agendado" && (
                   <>
@@ -379,14 +379,14 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
 
   return (
     <Drawer open={!!atendimento} onOpenChange={(o) => !o && onClose()}>
-      <DrawerContent>
+      <DrawerContent className="max-h-[92vh]">
         <DrawerHeader className="text-left">
           <DrawerTitle className="font-display text-2xl">Concluir atendimento</DrawerTitle>
           <DrawerDescription>
             {atendimento?.clientes?.nome ?? "—"} · {atendimento?.servicos?.nome ?? "Serviço"}
           </DrawerDescription>
         </DrawerHeader>
-        <form onSubmit={salvar} className="space-y-4 px-4 pb-8">
+        <form onSubmit={salvar} className="space-y-4 overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
           <div className="space-y-2">
             <Label>Valor (R$)</Label>
             <Input className="h-12 text-base" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} />

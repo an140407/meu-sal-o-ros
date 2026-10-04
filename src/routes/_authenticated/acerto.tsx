@@ -289,7 +289,7 @@ function RepasseForm({
           <DrawerHeader className="text-left">
             <DrawerTitle className="font-display text-2xl">{editing ? "Editar repasse" : "Registrar repasse"}</DrawerTitle>
           </DrawerHeader>
-          <form onSubmit={salvar} className="space-y-4 overflow-y-auto px-4 pb-8">
+          <form onSubmit={salvar} className="space-y-4 overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Valor (R$)</Label>
