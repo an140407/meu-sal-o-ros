@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Copy, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, Copy, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,10 +14,12 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PageHeader, Empty } from "@/components/app/ui-bits";
-import { useAtendimentosMes, useConfig, useRepasses, type Repasse } from "@/lib/data";
-import { brl, dataBR, dataHora, hojeISO, mesAno } from "@/lib/format";
+import { useAtendimentosMes, useConfig, useDespesas, useRepasses, type Repasse } from "@/lib/data";
+import { resumoDespesas } from "@/lib/despesas";
+import { brl, buscaMes, dataBR, dataHora, hojeISO, mesAno } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/acerto")({
+  validateSearch: buscaMes,
   head: () => ({
     meta: [
       { title: "Acerto do mês — Caderno da Nail" },
@@ -32,9 +34,12 @@ export const Route = createFileRoute("/_authenticated/acerto")({
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 function Page() {
-  const [mes, setMes] = useState(() => hojeISO().slice(0, 7));
+  const navigate = Route.useNavigate();
+  const mes = Route.useSearch().mes ?? hojeISO().slice(0, 7);
+  const setMes = (m: string) => navigate({ search: { mes: m }, replace: true });
   const { data: atends = [], isLoading } = useAtendimentosMes(mes);
   const { data: repasses = [] } = useRepasses(mes);
+  const { data: despesas = [] } = useDespesas(mes);
   const { data: cfg } = useConfig();
   const dona = cfg?.nome_dona ?? "Simone";
   const [open, setOpen] = useState(false);
@@ -47,6 +52,9 @@ function Page() {
   const parteDona = r2(liquido - ana);
   const repassado = r2(repasses.reduce((s, r) => s + Number(r.valor), 0));
   const saldo = r2(ana - repassado);
+  // Só informativo: despesas não entram no repasse, no saldo nem no resumo copiado.
+  const totalDespesas = resumoDespesas(despesas).total;
+  const lucroReal = r2(ana - totalDespesas);
 
   async function copiar() {
     const linhas = [
@@ -108,6 +116,27 @@ function Page() {
         </section>
 
         <Button size="xl" variant="secondary" onClick={copiar}><Copy /> Copiar resumo</Button>
+
+        <section className="rounded-2xl border bg-card p-4">
+          <h2 className="mb-2 text-xl">Lucro real da Ana</h2>
+          <div className="divide-y divide-border">
+            <div>
+              {linha("Parte da Ana", ana)}
+              {linha("Despesas do mês", -totalDespesas)}
+            </div>
+            <div className="flex justify-between py-1.5">
+              <span className="font-semibold">Lucro real</span>
+              <span className={lucroReal < 0 ? "font-semibold text-destructive" : "font-semibold"}>{brl(lucroReal)}</span>
+            </div>
+          </div>
+          <Link
+            to="/despesas"
+            search={{ mes }}
+            className="mt-2 flex h-12 items-center justify-between rounded-xl px-1 font-medium text-primary active:bg-muted"
+          >
+            Ver despesas <ChevronRight className="size-5" />
+          </Link>
+        </section>
 
         <section className="space-y-3">
           <h2 className="text-xl">Repasses</h2>

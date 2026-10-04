@@ -78,3 +78,9 @@ export const horaDeMinutos = (min: number) => {
   const m = Math.max(0, Math.min(min, 23 * 60 + 59));
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 };
+
+/** validateSearch das telas por mês (?mes=YYYY-MM); mês inválido é ignorado. */
+export const buscaMes = (search: Record<string, unknown>): { mes?: string } => {
+  const mes = search["mes"];
+  return typeof mes === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(mes) ? { mes } : {};
+};

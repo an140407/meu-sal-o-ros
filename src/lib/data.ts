@@ -116,6 +116,24 @@ export const useAtendimentosMes = (mes: string) =>
     },
   });
 
+export type Despesa = Tables<"despesas">;
+
+export const useDespesas = (mes: string) =>
+  useQuery({
+    queryKey: ["despesas", mes],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("despesas")
+        .select("*")
+        .gte("data", `${mes}-01`)
+        .lt("data", proximoMes(mes))
+        .order("data", { ascending: false })
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
 export const useRepasses = (mes: string) =>
   useQuery({
     queryKey: ["repasses", mes],
