@@ -116,6 +116,32 @@ export const useAtendimentosMes = (mes: string) =>
     },
   });
 
+/** Ids das clientes com algum 'agendado' a partir de `hoje`. */
+export const useClientesComAgendamento = (hoje: string) =>
+  useQuery({
+    queryKey: ["atendimentos", "agendados-futuros", hoje],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("atendimentos")
+        .select("cliente_id")
+        .eq("status", "agendado")
+        .gte("data", hoje);
+      if (error) throw error;
+      return new Set<string>(data.map((a) => a.cliente_id));
+    },
+  });
+
+/** Todos os repasses (para o saldo dos meses anteriores no Acerto). */
+export const useRepassesTodos = () =>
+  useQuery({
+    queryKey: ["repasses", "todos"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("repasses").select("*");
+      if (error) throw error;
+      return data;
+    },
+  });
+
 export type Despesa = Tables<"despesas">;
 
 export const useDespesas = (mes: string) =>

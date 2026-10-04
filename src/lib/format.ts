@@ -53,6 +53,9 @@ export const somarDias = (iso: string, n: number) => {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 };
+/** Dias de calendário de `de` até `ate` (ambos "YYYY-MM-DD"). */
+export const diasDesde = (de: string, ate: string) =>
+  Math.round((calendario(ate).getTime() - calendario(de).getTime()) / 86_400_000);
 /** Segunda-feira da semana de `iso`. */
 export const inicioSemana = (iso: string) => somarDias(iso, -((calendario(iso).getUTCDay() + 6) % 7));
 

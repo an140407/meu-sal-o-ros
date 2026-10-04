@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { linkGoogleAgenda, linkWhatsapp, normalizarTelefone } from "./links";
+import {
+  linkGoogleAgenda, linkWhatsapp, linkWhatsappTexto, mensagemAniversario, mensagemRetorno, normalizarTelefone,
+} from "./links";
 
 describe("normalizarTelefone", () => {
   it.each([
@@ -98,5 +100,21 @@ describe("linkGoogleAgenda", () => {
 
   it("retorna null sem horário", () => {
     expect(linkGoogleAgenda({ ...base, hora: null })).toBeNull();
+  });
+});
+
+describe("mensagens de retorno e aniversário", () => {
+  it("usam o primeiro nome", () => {
+    expect(mensagemRetorno("  Ana Paula Souza ", 32)).toBe(
+      "Oi, Ana! Já faz 32 dias do seu último atendimento. Vamos agendar sua manutenção?",
+    );
+    expect(mensagemAniversario("Júlia D'Ávila")).toBe("Parabéns, Júlia! Desejo um dia lindo para você.");
+  });
+
+  it("linkWhatsappTexto codifica e valida o telefone", () => {
+    const url = new URL(linkWhatsappTexto("(11) 98765-4321", mensagemAniversario("Bia"))!);
+    expect(url.pathname).toBe("/5511987654321");
+    expect(url.searchParams.get("text")).toBe("Parabéns, Bia! Desejo um dia lindo para você.");
+    expect(linkWhatsappTexto("", "oi")).toBeNull();
   });
 });

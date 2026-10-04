@@ -11,6 +11,20 @@ export function normalizarTelefone(telefone: string | null | undefined): string 
   return null;
 }
 
+export const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? "";
+
+/** Link do WhatsApp com mensagem livre, ou null se o telefone não é válido. */
+export function linkWhatsappTexto(telefone: string | null | undefined, mensagem: string): string | null {
+  const tel = normalizarTelefone(telefone);
+  return tel ? `https://wa.me/${tel}?text=${encodeURIComponent(mensagem)}` : null;
+}
+
+export const mensagemRetorno = (nome: string, dias: number) =>
+  `Oi, ${primeiroNome(nome)}! Já faz ${dias} dias do seu último atendimento. Vamos agendar sua manutenção?`;
+
+export const mensagemAniversario = (nome: string) =>
+  `Parabéns, ${primeiroNome(nome)}! Desejo um dia lindo para você.`;
+
 /** Link de confirmação por WhatsApp, ou null se a cliente não tem telefone válido. */
 export function linkWhatsapp(a: {
   telefone: string | null | undefined;
@@ -19,12 +33,9 @@ export function linkWhatsapp(a: {
   data: string;
   hora: string | null;
 }): string | null {
-  const tel = normalizarTelefone(a.telefone);
-  if (!tel) return null;
-  const nome = a.cliente.trim().split(/\s+/)[0] ?? "";
   const quando = `${diaSemana(a.data).toLowerCase()}, ${dataBR(a.data).slice(0, 5)}${a.hora ? `, às ${horaHM(a.hora)}` : ""}`;
-  const msg = `Oi, ${nome}! Passando para confirmar seu horário de ${quando} (${a.servico}). Pode confirmar?`;
-  return `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`;
+  const msg = `Oi, ${primeiroNome(a.cliente)}! Passando para confirmar seu horário de ${quando} (${a.servico}). Pode confirmar?`;
+  return linkWhatsappTexto(a.telefone, msg);
 }
 
 /** "YYYY-MM-DD" + minutos desde 00:00 do dia → "YYYYMMDDTHHMMSS" (hora local, sem Z). */

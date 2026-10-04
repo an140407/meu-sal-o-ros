@@ -39,13 +39,14 @@ export function AvisoSaude({ cliente }: { cliente: Cliente | undefined }) {
 }
 
 export function AgendaForm({
-  open, onOpenChange, editing, dia, horaSugerida,
+  open, onOpenChange, editing, dia, horaSugerida, clienteInicial,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   editing: Atendimento | null;
   dia: string;
   horaSugerida: string;
+  clienteInicial?: string | undefined;
 }) {
   const qc = useQueryClient();
   const { data: clientes = [] } = useClientes();
@@ -73,7 +74,7 @@ export function AgendaForm({
       setDuracao(String(editing.duracao_min));
       setObs(editing.observacoes ?? "");
     } else {
-      setClienteId("");
+      setClienteId(clienteInicial ?? "");
       setServicoId("");
       setValor("");
       setData(dia);
@@ -81,7 +82,7 @@ export function AgendaForm({
       setDuracao("60");
       setObs("");
     }
-  }, [open, editing, dia, horaSugerida]);
+  }, [open, editing, dia, horaSugerida, clienteInicial]);
 
   const v = Number(valor.replace(",", "."));
   const dur = Number(duracao);

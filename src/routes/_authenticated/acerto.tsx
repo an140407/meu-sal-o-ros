@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronRight, Copy, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,8 +14,10 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PageHeader, Empty } from "@/components/app/ui-bits";
-import { useAtendimentosMes, useConfig, useDespesas, useRepasses, type Repasse } from "@/lib/data";
+import { useAtendimentos, useAtendimentosMes, useConfig, useDespesas, useRepasses, useRepassesTodos, type Repasse } from "@/lib/data";
+import { saldoPorMes } from "@/lib/acerto";
 import { resumoDespesas } from "@/lib/despesas";
+import { cn } from "@/lib/utils";
 import { brl, buscaMes, dataBR, dataHora, hojeISO, mesAno } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/acerto")({
@@ -91,6 +93,8 @@ function Page() {
       <div className="space-y-5 px-5">
         <Input type="month" className="h-12 text-base" value={mes} onChange={(e) => e.target.value && setMes(e.target.value)} aria-label="Mês" />
 
+        <MesesAnteriores mes={mes} onSelect={setMes} />
+
         <section className="rounded-2xl bg-rose-gradient p-4">
           <div className="mb-2 flex items-baseline justify-between">
             <h2 className="text-xl">{mesAno(mes)}</h2>
@@ -160,6 +164,67 @@ function Page() {
       </div>
       <RepasseForm open={open} onOpenChange={setOpen} editing={editing} mes={mes} />
     </>
+  );
+}
+
+const rotuloSaldo = (v: number) => (v > 0 ? "a receber" : v < 0 ? "repassado a mais" : "em dia");
+
+function MesesAnteriores({ mes, onSelect }: { mes: string; onSelect: (m: string) => void }) {
+  const { data: atends, isLoading: l1 } = useAtendimentos();
+  const { data: repasses, isLoading: l2 } = useRepassesTodos();
+  const [aberto, setAberto] = useState(false);
+  if (l1 || l2 || !atends || !repasses) return null;
+
+  const { meses, total } = saldoPorMes(atends, repasses, mes);
+  if (meses.length === 0) return null;
+  const pendentes = meses.filter((m) => m.saldo !== 0);
+
+  return (
+    <section className="rounded-2xl border bg-card p-4">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 text-left"
+        onClick={() => setAberto(!aberto)}
+        aria-expanded={aberto}
+        disabled={pendentes.length === 0}
+      >
+        <div>
+          <h2 className="text-xl">Meses anteriores</h2>
+          <p className="text-sm text-muted-foreground">
+            {pendentes.length === 0 ? "Tudo acertado." : `${pendentes.length} mês(es) com saldo`}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-right">
+          <div>
+            <div className={cn("font-semibold", total < 0 && "text-destructive")}>{brl(Math.abs(total))}</div>
+            <div className="text-xs text-muted-foreground">{rotuloSaldo(total)}</div>
+          </div>
+          {pendentes.length > 0 && <ChevronDown className={cn("size-5 text-muted-foreground transition-transform", aberto && "rotate-180")} />}
+        </div>
+      </button>
+      {aberto && (
+        <ul className="mt-3 divide-y border-t">
+          {pendentes.map((m) => (
+            <li key={m.mes}>
+              <button
+                type="button"
+                onClick={() => onSelect(m.mes)}
+                className="flex h-14 w-full items-center justify-between gap-3 text-left active:bg-muted"
+              >
+                <span>{mesAno(m.mes)}</span>
+                <span className="flex items-center gap-2 text-right">
+                  <span>
+                    <span className={cn("block font-semibold", m.saldo < 0 && "text-destructive")}>{brl(Math.abs(m.saldo))}</span>
+                    <span className="block text-xs text-muted-foreground">{rotuloSaldo(m.saldo)}</span>
+                  </span>
+                  <ChevronRight className="size-5 text-muted-foreground" />
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

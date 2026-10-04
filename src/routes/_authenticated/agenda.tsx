@@ -21,6 +21,9 @@ import { linkGoogleAgenda, linkWhatsapp } from "@/lib/links";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/agenda")({
+  // ?cliente=<id> abre "Agendar" com a cliente pré-selecionada (vindo de Clientes › Para retorno).
+  validateSearch: (s: Record<string, unknown>): { cliente?: string } =>
+    typeof s["cliente"] === "string" && s["cliente"] ? { cliente: s["cliente"] } : {},
   head: () => ({
     meta: [
       { title: "Agenda — Caderno da Nail" },
@@ -58,6 +61,18 @@ function Page() {
   const [acoes, setAcoes] = useState<Atendimento | null>(null);
   const [concluir, setConcluir] = useState<Atendimento | null>(null);
   const [editRealizado, setEditRealizado] = useState<Atendimento | null>(null);
+  const [clienteInicial, setClienteInicial] = useState<string>();
+  const { cliente: clienteBusca } = Route.useSearch();
+  const navigate = Route.useNavigate();
+
+  useEffect(() => {
+    if (!clienteBusca) return;
+    setClienteInicial(clienteBusca);
+    setEditing(null);
+    setFormOpen(true);
+    // Limpa a URL para não reabrir o formulário ao recarregar.
+    navigate({ search: {}, replace: true });
+  }, [clienteBusca, navigate]);
 
   const comAgenda = new Set(semana.filter(ativo).map((a) => a.data));
   const doDia = semana.filter((a) => a.data === dia);
@@ -167,7 +182,7 @@ function Page() {
           <h2 className="text-xl">{diaPorExtenso(dia)}</h2>
           <span className="shrink-0 text-sm text-muted-foreground">{inicioExp}–{fimExp}</span>
         </div>
-        <Button size="xl" onClick={() => { setEditing(null); setFormOpen(true); }}>
+        <Button size="xl" onClick={() => { setEditing(null); setClienteInicial(undefined); setFormOpen(true); }}>
           <Plus /> Agendar
         </Button>
 
@@ -248,7 +263,7 @@ function Page() {
         </DrawerContent>
       </Drawer>
 
-      <AgendaForm open={formOpen} onOpenChange={setFormOpen} editing={editing} dia={dia} horaSugerida={horaSugerida} />
+      <AgendaForm open={formOpen} onOpenChange={setFormOpen} editing={editing} dia={dia} horaSugerida={horaSugerida} clienteInicial={clienteInicial} />
       <ConcluirForm atendimento={concluir} onClose={() => setConcluir(null)} />
       <AtendimentoForm open={!!editRealizado} onOpenChange={(o) => !o && setEditRealizado(null)} editing={editRealizado} />
     </>
