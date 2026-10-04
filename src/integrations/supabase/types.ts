@@ -5,7 +5,7 @@ export type Json =
   | null
   | { [key: string]: Json | undefined }
   | Json[]
-
+ 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -19,12 +19,14 @@ export type Database = {
           cliente_id: string
           created_at: string
           data: string
+          duracao_min: number
           forma_pagamento: string
           hora: string | null
           id: string
           observacoes: string | null
           percentual_ana: number
           servico_id: string | null
+          status: string
           taxa_percentual: number
           user_id: string
           valor_bruto: number
@@ -34,12 +36,14 @@ export type Database = {
           cliente_id: string
           created_at?: string
           data?: string
+          duracao_min?: number
           forma_pagamento: string
           hora?: string | null
           id?: string
           observacoes?: string | null
           percentual_ana?: number
           servico_id?: string | null
+          status?: string
           taxa_percentual?: number
           user_id?: string
           valor_bruto?: number
@@ -49,12 +53,14 @@ export type Database = {
           cliente_id?: string
           created_at?: string
           data?: string
+          duracao_min?: number
           forma_pagamento?: string
           hora?: string | null
           id?: string
           observacoes?: string | null
           percentual_ana?: number
           servico_id?: string | null
+          status?: string
           taxa_percentual?: number
           user_id?: string
           valor_bruto?: number
@@ -130,6 +136,8 @@ export type Database = {
       }
       configuracoes: {
         Row: {
+          hora_fim: string | null
+          hora_inicio: string | null
           nome_dona: string
           percentual_ana: number
           taxa_credito: number
@@ -137,6 +145,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          hora_fim?: string | null
+          hora_inicio?: string | null
           nome_dona?: string
           percentual_ana?: number
           taxa_credito?: number
@@ -144,11 +154,43 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          hora_fim?: string | null
+          hora_inicio?: string | null
           nome_dona?: string
           percentual_ana?: number
           taxa_credito?: number
           taxa_debito?: number
           user_id?: string
+        }
+        Relationships: []
+      }
+      despesas: {
+        Row: {
+          categoria: string | null
+          created_at: string | null
+          data: string
+          descricao: string
+          id: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string | null
+          data?: string
+          descricao: string
+          id?: string
+          user_id?: string
+          valor: number
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string | null
+          data?: string
+          descricao?: string
+          id?: string
+          user_id?: string
+          valor?: number
         }
         Relationships: []
       }
@@ -185,6 +227,7 @@ export type Database = {
       servicos: {
         Row: {
           ativo: boolean
+          duracao_min: number
           id: string
           nome: string
           preco_padrao: number
@@ -192,6 +235,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          duracao_min?: number
           id?: string
           nome: string
           preco_padrao?: number
@@ -199,6 +243,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          duracao_min?: number
           id?: string
           nome?: string
           preco_padrao?: number
@@ -221,11 +266,11 @@ export type Database = {
     }
   }
 }
-
+ 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
+ 
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
-
+ 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
@@ -254,7 +299,7 @@ export type Tables<
       ? R
       : never
     : never
-
+ 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
@@ -279,7 +324,7 @@ export type TablesInsert<
       ? I
       : never
     : never
-
+ 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
@@ -304,7 +349,7 @@ export type TablesUpdate<
       ? U
       : never
     : never
-
+ 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
@@ -321,7 +366,7 @@ export type Enums<
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
-
+ 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
@@ -338,7 +383,7 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-
+ 
 export const Constants = {
   public: {
     Enums: {},
