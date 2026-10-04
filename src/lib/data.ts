@@ -56,6 +56,7 @@ export const useAtendimentos = (clienteId?: string) =>
       let q = supabase
         .from("atendimentos")
         .select("*, clientes(nome), servicos(nome)")
+        .eq("status", "realizado")
         .order("data", { ascending: false })
         .order("hora", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false });
@@ -80,6 +81,7 @@ export const useAtendimentosMes = (mes: string) =>
       const { data, error } = await supabase
         .from("atendimentos")
         .select("*, clientes(nome), servicos(nome)")
+        .eq("status", "realizado")
         .gte("data", `${mes}-01`)
         .lt("data", proximoMes(mes))
         .order("data")

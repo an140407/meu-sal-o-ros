@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Responder sempre em português.
 - Nunca reescrever o histórico do git: sem force push, rebase ou amend em commits já enviados. O projeto está conectado ao Lovable e reescrever histórico faz o usuário perder o histórico lá (ver `AGENTS.md`). Commits na branch conectada sincronizam com o Lovable, então mantenha a branch funcionando.
 - Nunca editar o `.env`.
-- Mudanças de banco ficam num arquivo `.sql` separado, que o usuário aplica manualmente no SQL editor do Lovable Cloud. Não rodar `drizzle-kit`, não aplicar migrações por conta própria e não editar `src/integrations/supabase/types.ts` (gerado automaticamente).
+- Mudanças de banco ficam num arquivo `.sql` separado em `drizzle/manual/` (numeração seguindo `drizzle/migrations/`), que o usuário aplica manualmente no SQL editor do Lovable Cloud. Não rodar `drizzle-kit`, não aplicar migrações por conta própria e não editar `src/integrations/supabase/types.ts` (gerado automaticamente).
 - Ao terminar uma tarefa, entregar ao usuário a mensagem de commit sugerida.
 - Não alterar `bun.lock` nem `bunfig.toml` sem confirmar com o usuário (o `bunfig.toml` tem uma trava de 24h de idade mínima de pacote, de propósito).
 

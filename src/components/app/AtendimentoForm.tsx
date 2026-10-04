@@ -78,7 +78,7 @@ export function AtendimentoForm({
     };
     const { error } = editing
       ? await supabase.from("atendimentos").update(payload).eq("id", editing.id)
-      : await supabase.from("atendimentos").insert(payload);
+      : await supabase.from("atendimentos").insert({ ...payload, status: "realizado" });
     setSaving(false);
     if (error) return void toast.error("Não foi possível salvar.");
     toast.success(editing ? "Atendimento atualizado" : "Atendimento registrado");
