@@ -2,10 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 
+// Colunas da agenda (drizzle/manual/0003) declaradas aqui até o types.ts ser regenerado.
+export type Status = "agendado" | "realizado" | "cancelado" | "faltou";
+export const STATUS_ATIVOS: Status[] = ["agendado", "realizado"];
+
 export type Cliente = Tables<"clientes">;
-export type Servico = Tables<"servicos">;
-export type Config = Tables<"configuracoes">;
+export type Servico = Tables<"servicos"> & { duracao_min: number };
+export type Config = Tables<"configuracoes"> & { hora_inicio: string | null; hora_fim: string | null };
 export type Atendimento = Tables<"atendimentos"> & {
+  status: Status;
+  duracao_min: number;
   clientes: { nome: string } | null;
   servicos: { nome: string } | null;
 };
@@ -34,7 +40,7 @@ export const useServicos = () =>
       await garantirSetup();
       const { data, error } = await supabase.from("servicos").select("*").order("nome");
       if (error) throw error;
-      return data;
+      return data as Servico[];
     },
   });
 
@@ -45,7 +51,7 @@ export const useConfig = () =>
       await garantirSetup();
       const { data, error } = await supabase.from("configuracoes").select("*").maybeSingle();
       if (error) throw error;
-      return data;
+      return data as Config | null;
     },
   });
 
@@ -62,6 +68,24 @@ export const useAtendimentos = (clienteId?: string) =>
         .order("created_at", { ascending: false });
       if (clienteId) q = q.eq("cliente_id", clienteId);
       const { data, error } = await q;
+      if (error) throw error;
+      return data as Atendimento[];
+    },
+  });
+
+/** Todos os status, de `inicio` a `fim` (inclusive). Prefixo "atendimentos" para ser invalidada junto. */
+export const useAgenda = (inicio: string, fim: string) =>
+  useQuery({
+    queryKey: ["atendimentos", "agenda", inicio, fim],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("atendimentos")
+        .select("*, clientes(nome), servicos(nome)")
+        .gte("data", inicio)
+        .lte("data", fim)
+        .order("data")
+        .order("hora", { nullsFirst: false })
+        .order("created_at");
       if (error) throw error;
       return data as Atendimento[];
     },

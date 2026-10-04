@@ -39,10 +39,10 @@ function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/atendimentos", replace: true });
+      if (data.session) navigate({ to: "/agenda", replace: true });
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" && session) navigate({ to: "/atendimentos", replace: true });
+      if (event === "SIGNED_IN" && session) navigate({ to: "/agenda", replace: true });
     });
     return () => sub.subscription.unsubscribe();
   }, [navigate]);
@@ -56,7 +56,7 @@ function AuthPage() {
         return;
       }
       if (result.redirected) return;
-      navigate({ to: "/atendimentos" });
+      navigate({ to: "/agenda" });
     } catch {
       toast.error("Não foi possível entrar com o Google.");
     } finally {
@@ -77,7 +77,7 @@ function AuthPage() {
         );
         return;
       }
-      navigate({ to: "/atendimentos" });
+      navigate({ to: "/agenda" });
     } catch {
       toast.error("E-mail ou senha inválidos.");
     } finally {

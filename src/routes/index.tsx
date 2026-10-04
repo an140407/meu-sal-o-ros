@@ -18,7 +18,7 @@ function Index() {
   const navigate = useNavigate();
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      navigate({ to: data.session ? "/atendimentos" : "/auth", replace: true });
+      navigate({ to: data.session ? "/agenda" : "/auth", replace: true });
     });
   }, [navigate]);
   return (

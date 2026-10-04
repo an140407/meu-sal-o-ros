@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
-import { Sparkles, Users, Settings, Wallet } from "lucide-react";
+import { CalendarDays, Sparkles, Users, Settings, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -13,6 +13,7 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 const tabs = [
+  { to: "/agenda", label: "Agenda", icon: CalendarDays },
   { to: "/atendimentos", label: "Atendimentos", icon: Sparkles },
   { to: "/clientes", label: "Clientes", icon: Users },
   { to: "/acerto", label: "Acerto", icon: Wallet },
@@ -24,7 +25,7 @@ function Layout() {
     <div className="mx-auto min-h-screen max-w-lg pb-28">
       <Outlet />
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto grid max-w-lg grid-cols-4">
+        <div className="mx-auto grid max-w-lg grid-cols-5">
           {tabs.map((t) => (
             <Link
               key={t.to}
