@@ -35,9 +35,10 @@ const top5 = (m: Map<string, Ranking>) =>
 
 /**
  * Estatísticas dos `meses` informados. Dinheiro, contagens e rankings usam só 'realizado';
- * a taxa de faltas/cancelamentos é (faltou + cancelado) ÷ todos os registros do período.
+ * a taxa de faltas/cancelamentos é (faltou + cancelado) ÷ registros do período com data até
+ * `hoje` (agendamentos futuros ainda não tiveram chance de faltar).
  */
-export function estatisticas(atendimentos: AtendimentoEstat[], meses: string[]) {
+export function estatisticas(atendimentos: AtendimentoEstat[], meses: string[], hoje: string) {
   const noPeriodo = atendimentos.filter((a) => meses.includes(a.data.slice(0, 7)));
   const realizados = noPeriodo.filter((a) => a.status === "realizado");
 
@@ -63,8 +64,9 @@ export function estatisticas(atendimentos: AtendimentoEstat[], meses: string[]) 
   }
 
   const bruto = r2(porMes.reduce((s, m) => s + m.bruto, 0));
-  const faltas = noPeriodo.filter((a) => a.status === "faltou").length;
-  const cancelados = noPeriodo.filter((a) => a.status === "cancelado").length;
+  const ateHoje = noPeriodo.filter((a) => a.data <= hoje);
+  const faltas = ateHoje.filter((a) => a.status === "faltou").length;
+  const cancelados = ateHoje.filter((a) => a.status === "cancelado").length;
 
   return {
     porMes,
@@ -76,7 +78,7 @@ export function estatisticas(atendimentos: AtendimentoEstat[], meses: string[]) 
     topClientes: top5(clientes),
     faltas,
     cancelados,
-    totalAgendamentos: noPeriodo.length,
-    taxaFaltasCancelamentos: noPeriodo.length ? (faltas + cancelados) / noPeriodo.length : 0,
+    totalAgendamentos: ateHoje.length,
+    taxaFaltasCancelamentos: ateHoje.length ? (faltas + cancelados) / ateHoje.length : 0,
   };
 }

@@ -1,8 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Receipt, Trash2 } from "lucide-react";
+import { Plus, Receipt, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Empty } from "@/components/app/ui-bits";
+import { Voltar } from "@/components/app/Voltar";
 import { useDespesas, type Despesa } from "@/lib/data";
 import { CATEGORIAS_DESPESA, SEM_CATEGORIA, resumoDespesas } from "@/lib/despesas";
 import { brl, buscaMes, dataBR, hojeISO, mesAno } from "@/lib/format";
@@ -43,9 +44,7 @@ function Page() {
   return (
     <>
       <header className="px-5 pb-3 pt-6">
-        <Link to="/acerto" search={{ mes }} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-          <ArrowLeft className="size-4" /> Acerto
-        </Link>
+        <Voltar label="Acerto" fallback={() => navigate({ to: "/acerto", search: { mes } })} />
         <h1 className="mt-2 text-3xl text-foreground">Despesas</h1>
       </header>
       <div className="space-y-5 px-5">

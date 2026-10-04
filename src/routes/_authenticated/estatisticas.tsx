@@ -1,12 +1,13 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, BarChart3 } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import {
   ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig,
 } from "@/components/ui/chart";
 import { Empty } from "@/components/app/ui-bits";
+import { Voltar } from "@/components/app/Voltar";
 import { proximoMes, useAtendimentosPeriodo } from "@/lib/data";
 import { estatisticas, mesCurto, mesesPeriodo, type Ranking } from "@/lib/estatisticas";
 import { brl, hojeISO, mesAno } from "@/lib/format";
@@ -35,19 +36,17 @@ const compacto = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFr
 const pct = (v: number) => `${(v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 
 function Page() {
-  const router = useRouter();
+  const navigate = Route.useNavigate();
   const [periodo, setPeriodo] = useState<number>(6);
   const meses = mesesPeriodo(hojeISO().slice(0, 7), periodo);
   const { data = [], isLoading } = useAtendimentosPeriodo(`${meses[0]}-01`, proximoMes(meses[meses.length - 1]!));
-  const e = estatisticas(data, meses);
-  const vazio = e.totalAgendamentos === 0;
+  const e = estatisticas(data, meses, hojeISO());
+  const vazio = e.realizados === 0 && e.totalAgendamentos === 0;
 
   return (
     <>
       <header className="px-5 pb-3 pt-6">
-        <button type="button" onClick={() => router.history.back()} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-          <ArrowLeft className="size-4" /> Voltar
-        </button>
+        <Voltar label="Voltar" fallback={() => navigate({ to: "/acerto" })} />
         <h1 className="mt-2 text-3xl text-foreground">Estatísticas</h1>
       </header>
       <div className="space-y-5 px-5 pb-6">

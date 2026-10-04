@@ -29,6 +29,7 @@ const at = (p: Partial<AtendimentoEstat> & { data: string }): AtendimentoEstat =
 
 describe("estatisticas", () => {
   const meses = ["2026-09", "2026-10"];
+  const hoje = "2026-10-31";
 
   it("soma dinheiro só dos realizados, por mês, e calcula ticket médio", () => {
     const e = estatisticas(
@@ -41,6 +42,7 @@ describe("estatisticas", () => {
         at({ data: "2026-08-31", valor_bruto: 999 }), // fora do período
       ],
       meses,
+      hoje,
     );
     expect(e.porMes).toEqual([
       { mes: "2026-09", bruto: 250, ana: 157.3, qtd: 2 },
@@ -59,7 +61,7 @@ describe("estatisticas", () => {
       ),
       at({ data: "2026-10-01", servico_id: null, servicos: null, status: "faltou" }),
     ];
-    const e = estatisticas(lista, meses);
+    const e = estatisticas(lista, meses, hoje);
     expect(e.topServicos.map((s) => [s.nome, s.qtd, s.valor])).toEqual([
       ["S2", 3, 90],
       ["S1", 2, 10],
@@ -70,22 +72,30 @@ describe("estatisticas", () => {
     expect(e.topClientes.map((c) => [c.nome, c.qtd])).toEqual([["C0", 4], ["C2", 3], ["C1", 3]]);
   });
 
-  it("taxa de faltas e cancelamentos sobre todos os registros do período", () => {
+  it("taxa de faltas e cancelamentos só com registros até hoje", () => {
     const e = estatisticas(
       [
         at({ data: "2026-10-01" }),
         at({ data: "2026-10-02", status: "faltou" }),
         at({ data: "2026-10-03", status: "cancelado" }),
-        at({ data: "2026-10-04", status: "agendado" }),
-        at({ data: "2026-07-01", status: "faltou" }),
+        at({ data: "2026-10-04", status: "agendado" }), // hoje: entra
+        at({ data: "2026-10-05", status: "agendado" }), // futuro: fora do denominador
+        at({ data: "2026-10-20", status: "cancelado" }), // futuro: fora também
+        at({ data: "2026-07-01", status: "faltou" }), // fora do período
       ],
       meses,
+      "2026-10-04",
     );
     expect([e.faltas, e.cancelados, e.totalAgendamentos, e.taxaFaltasCancelamentos]).toEqual([1, 1, 4, 0.5]);
   });
 
+  it("período só com agendamentos futuros não tem taxa", () => {
+    const e = estatisticas([at({ data: "2026-10-10", status: "agendado" })], meses, "2026-10-04");
+    expect([e.totalAgendamentos, e.taxaFaltasCancelamentos]).toEqual([0, 0]);
+  });
+
   it("período vazio", () => {
-    const e = estatisticas([], meses);
+    const e = estatisticas([], meses, hoje);
     expect(e.realizados).toBe(0);
     expect(e.ticketMedio).toBe(0);
     expect(e.taxaFaltasCancelamentos).toBe(0);
