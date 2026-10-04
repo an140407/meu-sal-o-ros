@@ -57,6 +57,7 @@ export const useAtendimentos = (clienteId?: string) =>
         .from("atendimentos")
         .select("*, clientes(nome), servicos(nome)")
         .order("data", { ascending: false })
+        .order("hora", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false });
       if (clienteId) q = q.eq("cliente_id", clienteId);
       const { data, error } = await q;
@@ -82,6 +83,7 @@ export const useAtendimentosMes = (mes: string) =>
         .gte("data", `${mes}-01`)
         .lt("data", proximoMes(mes))
         .order("data")
+        .order("hora", { nullsFirst: false })
         .order("created_at");
       if (error) throw error;
       return data as Atendimento[];

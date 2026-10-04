@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PageHeader, Empty } from "@/components/app/ui-bits";
 import { useAtendimentosMes, useConfig, useRepasses, type Repasse } from "@/lib/data";
-import { brl, dataBR, hojeISO, mesAno } from "@/lib/format";
+import { brl, dataBR, dataHora, hojeISO, mesAno } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/acerto")({
   head: () => ({
@@ -52,7 +52,7 @@ function Page() {
     const linhas = [
       `Acerto ${mesAno(mes)}`,
       "",
-      ...atends.map((a) => `${dataBR(a.data)} - ${a.clientes?.nome ?? "—"} - ${a.servicos?.nome ?? "Serviço"} - ${brl(a.valor_bruto)}`),
+      ...atends.map((a) => `${dataHora(a.data, a.hora)} - ${a.clientes?.nome ?? "—"} - ${a.servicos?.nome ?? "Serviço"} - ${brl(a.valor_bruto)}`),
       "",
       `Total bruto: ${brl(bruto)}`,
       `Taxas: ${brl(taxas)}`,

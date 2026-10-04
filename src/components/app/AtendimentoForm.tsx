@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "./ui-bits";
 import { ClienteForm, emptyCliente } from "./ClienteForm";
 import { useClientes, useServicos, type Atendimento } from "@/lib/data";
-import { FORMAS, hojeISO, type Forma } from "@/lib/format";
+import { FORMAS, hojeISO, horaAgora, horaHM, type Forma } from "@/lib/format";
 
 export function AtendimentoForm({
   open, onOpenChange, editing, clienteFixo,
@@ -32,6 +32,7 @@ export function AtendimentoForm({
   const [servicoId, setServicoId] = useState("");
   const [valor, setValor] = useState("");
   const [data, setData] = useState(hojeISO());
+  const [hora, setHora] = useState("");
   const [forma, setForma] = useState<Forma>("pix");
   const [obs, setObs] = useState("");
   const [novoCliente, setNovoCliente] = useState(false);
@@ -46,6 +47,7 @@ export function AtendimentoForm({
       setServicoId(editing.servico_id ?? "");
       setValor(String(editing.valor_bruto));
       setData(editing.data);
+      setHora(horaHM(editing.hora));
       setForma(editing.forma_pagamento as Forma);
       setObs(editing.observacoes ?? "");
     } else {
@@ -53,6 +55,7 @@ export function AtendimentoForm({
       setServicoId("");
       setValor("");
       setData(hojeISO());
+      setHora(horaAgora());
       setForma("pix");
       setObs("");
     }
@@ -70,7 +73,7 @@ export function AtendimentoForm({
     if (!Number.isFinite(v) || v < 0) return void toast.error("Valor inválido.");
     setSaving(true);
     const payload = {
-      cliente_id: clienteId, servico_id: servicoId, valor_bruto: v, data,
+      cliente_id: clienteId, servico_id: servicoId, valor_bruto: v, data, hora: hora || null,
       forma_pagamento: forma, observacoes: obs.trim() || null,
     };
     const { error } = editing
@@ -152,14 +155,18 @@ export function AtendimentoForm({
                     {ativos.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
                   </NativeSelect>
                 </div>
+                <div className="space-y-2">
+                  <Label>Valor (R$)</Label>
+                  <Input className="h-12 text-base" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} />
+                </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Valor (R$)</Label>
-                    <Input className="h-12 text-base" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} />
-                  </div>
                   <div className="space-y-2">
                     <Label>Data</Label>
                     <Input className="h-12 text-base" type="date" required value={data} onChange={(e) => setData(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Hora</Label>
+                    <Input className="h-12 text-base" type="time" step={60} value={hora} onChange={(e) => setHora(e.target.value)} />
                   </div>
                 </div>
                 <div className="space-y-2">
