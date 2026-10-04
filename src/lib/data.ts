@@ -93,7 +93,7 @@ export const useAgenda = (inicio: string, fim: string) =>
 
 export type Repasse = Tables<"repasses">;
 
-const proximoMes = (mes: string) => {
+export const proximoMes = (mes: string) => {
   const [y, m] = mes.split("-").map(Number) as [number, number];
   return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
 };
@@ -139,6 +139,21 @@ export const useRepassesTodos = () =>
       const { data, error } = await supabase.from("repasses").select("*");
       if (error) throw error;
       return data;
+    },
+  });
+
+/** Todos os status, de `inicio` (inclusive) até `fim` (exclusive), para as estatísticas. */
+export const useAtendimentosPeriodo = (inicio: string, fim: string) =>
+  useQuery({
+    queryKey: ["atendimentos", "periodo", inicio, fim],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("atendimentos")
+        .select("*, clientes(nome), servicos(nome)")
+        .gte("data", inicio)
+        .lt("data", fim);
+      if (error) throw error;
+      return data as Atendimento[];
     },
   });
 

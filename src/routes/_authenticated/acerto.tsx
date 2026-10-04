@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Copy, Plus, Trash2 } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronRight, Copy, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -141,6 +141,14 @@ function Page() {
             Ver despesas <ChevronRight className="size-5" />
           </Link>
         </section>
+
+        <Link
+          to="/estatisticas"
+          className="flex h-14 items-center justify-between rounded-2xl border bg-card px-4 font-medium active:bg-muted"
+        >
+          <span className="flex items-center gap-2"><BarChart3 className="size-5 text-primary" /> Estatísticas</span>
+          <ChevronRight className="size-5 text-muted-foreground" />
+        </Link>
 
         <section className="space-y-3">
           <h2 className="text-xl">Repasses</h2>

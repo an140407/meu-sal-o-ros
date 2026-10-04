@@ -1,8 +1,8 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { LogOut } from "lucide-react";
+import { BarChart3, ChevronRight, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -170,6 +170,14 @@ function Page() {
             <Button type="submit" className="h-12 rounded-xl">Adicionar</Button>
           </form>
         </section>
+
+        <Link
+          to="/estatisticas"
+          className="flex h-14 items-center justify-between rounded-2xl border bg-card px-4 font-medium active:bg-muted"
+        >
+          <span className="flex items-center gap-2"><BarChart3 className="size-5 text-primary" /> Estatísticas</span>
+          <ChevronRight className="size-5 text-muted-foreground" />
+        </Link>
 
         <Button variant="outline" className="h-12 w-full rounded-2xl" onClick={sair}><LogOut /> Sair</Button>
       </div>

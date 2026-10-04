@@ -17,6 +17,7 @@ import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedAjustesRouteImport } from './routes/_authenticated/ajustes'
 import { Route as AuthenticatedAtendimentosRouteImport } from './routes/_authenticated/atendimentos'
 import { Route as AuthenticatedDespesasRouteImport } from './routes/_authenticated/despesas'
+import { Route as AuthenticatedEstatisticasRouteImport } from './routes/_authenticated/estatisticas'
 import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authenticated/clientes.index'
 import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes.$id'
 
@@ -60,6 +61,12 @@ const AuthenticatedDespesasRoute = AuthenticatedDespesasRouteImport.update({
   path: '/despesas',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedEstatisticasRoute =
+  AuthenticatedEstatisticasRouteImport.update({
+    id: '/estatisticas',
+    path: '/estatisticas',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClientesIndexRoute =
   AuthenticatedClientesIndexRouteImport.update({
     id: '/clientes/',
@@ -80,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/ajustes': typeof AuthenticatedAjustesRoute
   '/atendimentos': typeof AuthenticatedAtendimentosRoute
   '/despesas': typeof AuthenticatedDespesasRoute
+  '/estatisticas': typeof AuthenticatedEstatisticasRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes/': typeof AuthenticatedClientesIndexRoute
 }
@@ -91,6 +99,7 @@ export interface FileRoutesByTo {
   '/ajustes': typeof AuthenticatedAjustesRoute
   '/atendimentos': typeof AuthenticatedAtendimentosRoute
   '/despesas': typeof AuthenticatedDespesasRoute
+  '/estatisticas': typeof AuthenticatedEstatisticasRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes': typeof AuthenticatedClientesIndexRoute
 }
@@ -104,6 +113,7 @@ export interface FileRoutesById {
   '/_authenticated/ajustes': typeof AuthenticatedAjustesRoute
   '/_authenticated/atendimentos': typeof AuthenticatedAtendimentosRoute
   '/_authenticated/despesas': typeof AuthenticatedDespesasRoute
+  '/_authenticated/estatisticas': typeof AuthenticatedEstatisticasRoute
   '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/_authenticated/clientes/': typeof AuthenticatedClientesIndexRoute
 }
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/ajustes'
     | '/atendimentos'
     | '/despesas'
+    | '/estatisticas'
     | '/clientes/$id'
     | '/clientes/'
   fileRoutesByTo: FileRoutesByTo
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/ajustes'
     | '/atendimentos'
     | '/despesas'
+    | '/estatisticas'
     | '/clientes/$id'
     | '/clientes'
   id:
@@ -140,6 +152,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ajustes'
     | '/_authenticated/atendimentos'
     | '/_authenticated/despesas'
+    | '/_authenticated/estatisticas'
     | '/_authenticated/clientes/$id'
     | '/_authenticated/clientes/'
   fileRoutesById: FileRoutesById
@@ -208,6 +221,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDespesasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/estatisticas': {
+      id: '/_authenticated/estatisticas'
+      path: '/estatisticas'
+      fullPath: '/estatisticas'
+      preLoaderRoute: typeof AuthenticatedEstatisticasRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/clientes/': {
       id: '/_authenticated/clientes/'
       path: '/clientes'
@@ -231,6 +251,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAjustesRoute: typeof AuthenticatedAjustesRoute
   AuthenticatedAtendimentosRoute: typeof AuthenticatedAtendimentosRoute
   AuthenticatedDespesasRoute: typeof AuthenticatedDespesasRoute
+  AuthenticatedEstatisticasRoute: typeof AuthenticatedEstatisticasRoute
   AuthenticatedClientesIdRoute: typeof AuthenticatedClientesIdRoute
   AuthenticatedClientesIndexRoute: typeof AuthenticatedClientesIndexRoute
 }
@@ -241,6 +262,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAjustesRoute: AuthenticatedAjustesRoute,
   AuthenticatedAtendimentosRoute: AuthenticatedAtendimentosRoute,
   AuthenticatedDespesasRoute: AuthenticatedDespesasRoute,
+  AuthenticatedEstatisticasRoute: AuthenticatedEstatisticasRoute,
   AuthenticatedClientesIdRoute: AuthenticatedClientesIdRoute,
   AuthenticatedClientesIndexRoute: AuthenticatedClientesIndexRoute,
 }
