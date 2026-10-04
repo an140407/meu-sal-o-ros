@@ -15,8 +15,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "./ui-bits";
 import { ClienteForm, emptyCliente } from "./ClienteForm";
-import { STATUS_ATIVOS, useClientes, useServicos, type Atendimento, type Cliente, type Status } from "@/lib/data";
-import { horaHM, minutos } from "@/lib/format";
+import { STATUS_ATIVOS, useAgenda, useClientes, useConfig, useServicos, type Atendimento, type Cliente, type Status } from "@/lib/data";
+import { hojeISO, horaAgora, horaHM, minutos } from "@/lib/format";
+import { horariosLivres } from "@/lib/agenda";
+import { cn } from "@/lib/utils";
 
 export function AvisoSaude({ cliente }: { cliente: Cliente | undefined }) {
   if (!cliente) return null;
@@ -86,6 +88,20 @@ export function AgendaForm({
 
   const v = Number(valor.replace(",", "."));
   const dur = Number(duracao);
+
+  const { data: cfg } = useConfig();
+  const { data: doDiaForm, isLoading: carregandoDia } = useAgenda(data || dia, data || dia);
+  const livres =
+    data && Number.isInteger(dur) && dur >= 15 && dur <= 480
+      ? horariosLivres({
+          agendamentos: doDiaForm ?? [],
+          inicioExpediente: horaHM(cfg?.hora_inicio) || "08:00",
+          fimExpediente: horaHM(cfg?.hora_fim) || "19:00",
+          duracao: dur,
+          ignorarId: editing?.id,
+          agora: data === hojeISO() ? horaAgora() : null,
+        })
+      : [];
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
@@ -208,15 +224,38 @@ export function AgendaForm({
                     <Input className="h-12 text-base" inputMode="numeric" value={duracao} onChange={(e) => setDuracao(e.target.value)} />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Data</Label>
-                    <Input className="h-12 text-base" type="date" required value={data} onChange={(e) => setData(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Hora</Label>
-                    <Input className="h-12 text-base" type="time" step={60} required value={hora} onChange={(e) => setHora(e.target.value)} />
-                  </div>
+                <div className="space-y-2">
+                  <Label>Data</Label>
+                  <Input className="h-12 text-base" type="date" required value={data} onChange={(e) => setData(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label id="horarios-livres">Horários livres</Label>
+                  {carregandoDia ? (
+                    <p className="text-sm text-muted-foreground">Carregando horários...</p>
+                  ) : livres.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sem horários livres neste dia.</p>
+                  ) : (
+                    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" role="group" aria-labelledby="horarios-livres">
+                      {livres.map((h) => (
+                        <button
+                          key={h}
+                          type="button"
+                          aria-pressed={hora === h}
+                          onClick={() => setHora(h)}
+                          className={cn(
+                            "h-10 shrink-0 rounded-full border px-4 text-base tabular-nums",
+                            hora === h ? "border-primary bg-primary text-primary-foreground" : "bg-card active:bg-muted",
+                          )}
+                        >
+                          {h}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Hora</Label>
+                  <Input className="h-12 text-base" type="time" step={60} required value={hora} onChange={(e) => setHora(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>Observações</Label>

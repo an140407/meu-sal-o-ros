@@ -12,11 +12,12 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } f
 import { PageHeader, Empty } from "@/components/app/ui-bits";
 import { AgendaForm, AvisoSaude } from "@/components/app/AgendaForm";
 import { AtendimentoForm } from "@/components/app/AtendimentoForm";
-import { STATUS_ATIVOS, useAgenda, useClientes, useConfig, type Atendimento, type Status } from "@/lib/data";
+import { STATUS_ATIVOS, proximoMes, useAgenda, useClientes, useConfig, type Atendimento, type Status } from "@/lib/data";
 import {
   FORMAS, brl, diaDoMes, diaPorExtenso, diaSemanaCurto, hojeISO, horaDeMinutos, horaHM,
-  inicioSemana, minutos, somarDias, type Forma,
+  inicioSemana, mesAno, minutos, somarDias, type Forma,
 } from "@/lib/format";
+import { gradeMes } from "@/lib/agenda";
 import { linkGoogleAgenda, linkWhatsapp } from "@/lib/links";
 import { cn } from "@/lib/utils";
 
@@ -49,9 +50,16 @@ const intervalo = (a: Atendimento) =>
 function Page() {
   const hoje = hojeISO();
   const [dia, setDia] = useState(hoje);
+  const [visao, setVisao] = useState<"dia" | "mes">("dia");
   const inicio = inicioSemana(dia);
   const dias = Array.from({ length: 7 }, (_, i) => somarDias(inicio, i));
-  const { data: semana = [], isLoading } = useAgenda(inicio, dias[6]!);
+  const mes = dia.slice(0, 7);
+  const grade = gradeMes(mes);
+  // Uma consulta só: a semana na visão de Dia, a grade inteira (com semanas parciais) na de Mês.
+  const { data: semana = [], isLoading } = useAgenda(
+    visao === "mes" ? grade[0]! : inicio,
+    visao === "mes" ? grade[grade.length - 1]! : dias[6]!,
+  );
   const { data: cfg } = useConfig();
   const { data: clientes = [] } = useClientes();
   const qc = useQueryClient();
@@ -75,6 +83,8 @@ function Page() {
   }, [clienteBusca, navigate]);
 
   const comAgenda = new Set(semana.filter(ativo).map((a) => a.data));
+  const ativosPorDia = new Map<string, number>();
+  for (const a of semana.filter(ativo)) ativosPorDia.set(a.data, (ativosPorDia.get(a.data) ?? 0) + 1);
   const doDia = semana.filter((a) => a.data === dia);
 
   const inicioExp = horaHM(cfg?.hora_inicio) || "08:00";
@@ -140,89 +150,155 @@ function Page() {
         <Button variant="outline" className="h-11 rounded-xl" onClick={() => setDia(hoje)}>Hoje</Button>
       </PageHeader>
 
-      <div className="flex items-center gap-1 px-2">
-        <Button variant="ghost" className="h-16 w-10 shrink-0 px-0" aria-label="Semana anterior" onClick={() => setDia(somarDias(dia, -7))}>
-          <ChevronLeft className="size-6" />
-        </Button>
-        <div className="grid flex-1 grid-cols-7 gap-1">
-          {dias.map((d) => {
-            const sel = d === dia;
-            return (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDia(d)}
-                aria-pressed={sel}
-                aria-label={`${diaPorExtenso(d)}${d === hoje ? " (hoje)" : ""}${comAgenda.has(d) ? ", com agendamentos" : ""}`}
-                className={cn(
-                  "flex h-16 flex-col items-center justify-center rounded-xl",
-                  sel ? "bg-primary text-primary-foreground shadow-soft" : "active:bg-muted",
-                  d === hoje && !sel && "bg-secondary font-semibold text-primary ring-1 ring-primary",
-                )}
-              >
-                <span className="text-[11px] uppercase tracking-wide">{diaSemanaCurto(d)}</span>
-                <span className="text-lg font-semibold leading-tight">{diaDoMes(d)}</span>
-                <span
-                  className={cn(
-                    "mt-0.5 size-1.5 rounded-full",
-                    comAgenda.has(d) ? (sel ? "bg-primary-foreground" : "bg-primary") : "bg-transparent",
-                  )}
-                />
-              </button>
-            );
-          })}
-        </div>
-        <Button variant="ghost" className="h-16 w-10 shrink-0 px-0" aria-label="Próxima semana" onClick={() => setDia(somarDias(dia, 7))}>
-          <ChevronRight className="size-6" />
-        </Button>
+      <div className="grid grid-cols-2 gap-2 px-5 pb-3" role="group" aria-label="Visão da agenda">
+        {(["dia", "mes"] as const).map((v) => (
+          <Button
+            key={v}
+            type="button"
+            variant={visao === v ? "default" : "outline"}
+            className="h-11 rounded-xl text-base"
+            aria-pressed={visao === v}
+            onClick={() => setVisao(v)}
+          >
+            {v === "dia" ? "Dia" : "Mês"}
+          </Button>
+        ))}
       </div>
 
-      <div className="space-y-4 px-5 pt-4">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-xl">{diaPorExtenso(dia)}</h2>
-          <span className="shrink-0 text-sm text-muted-foreground">{inicioExp}–{fimExp}</span>
-        </div>
-        <Button size="xl" onClick={() => { setEditing(null); setClienteInicial(undefined); setFormOpen(true); }}>
-          <Plus /> Agendar
-        </Button>
-
-        {isLoading ? <Empty>Carregando...</Empty> : doDia.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 rounded-2xl bg-rose-gradient px-5 py-10 text-center">
-            <CalendarDays className="size-8 text-primary" />
-            <p className="font-semibold">Dia livre por enquanto</p>
-            <p className="text-sm text-muted-foreground">Toque em “Agendar” para marcar uma cliente.</p>
+      {visao === "mes" ? (
+        <div className="px-2">
+          <div className="flex items-center justify-between gap-2">
+            <Button variant="ghost" className="h-12 w-10 shrink-0 px-0" aria-label="Mês anterior" onClick={() => setDia(`${somarDias(`${mes}-01`, -1).slice(0, 7)}-01`)}>
+              <ChevronLeft className="size-6" />
+            </Button>
+            <h2 className="text-xl">{mesAno(mes)}</h2>
+            <Button variant="ghost" className="h-12 w-10 shrink-0 px-0" aria-label="Próximo mês" onClick={() => setDia(proximoMes(mes))}>
+              <ChevronRight className="size-6" />
+            </Button>
           </div>
-        ) : (
-          <ul className="space-y-3">
-            {doDia.map((a) => (
-              <li key={a.id}>
+          <div className="grid grid-cols-7 gap-1 px-1 pt-2 text-center text-[11px] uppercase tracking-wide text-muted-foreground">
+            {grade.slice(0, 7).map((d) => <div key={d}>{diaSemanaCurto(d)}</div>)}
+          </div>
+          <div className="grid grid-cols-7 gap-1 px-1 pt-1">
+            {grade.map((d) => {
+              const n = ativosPorDia.get(d) ?? 0;
+              const foraDoMes = !d.startsWith(mes);
+              return (
                 <button
+                  key={d}
                   type="button"
-                  onClick={() => setAcoes(a)}
+                  onClick={() => { setDia(d); setVisao("dia"); }}
+                  aria-label={`${diaPorExtenso(d)}${d === hoje ? " (hoje)" : ""}, ${n} agendamento(s)`}
                   className={cn(
-                    "w-full rounded-2xl border border-l-4 bg-card px-4 py-3 text-left active:bg-muted",
-                    STATUS[a.status].borda,
-                    !ativo(a) && "opacity-50",
+                    "flex h-16 flex-col items-center justify-start gap-1 rounded-xl pt-1.5 active:bg-muted",
+                    foraDoMes && "text-muted-foreground/60",
+                    d === hoje && "bg-secondary font-semibold text-primary ring-1 ring-primary",
                   )}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-semibold tabular-nums">{intervalo(a)}</span>
-                    <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", STATUS[a.status].badge)}>
-                      {STATUS[a.status].label}
+                  <span className="text-base leading-tight">{diaDoMes(d)}</span>
+                  {n > 0 && (
+                    <span
+                      className={cn(
+                        "min-w-6 rounded-full px-1.5 text-xs font-semibold leading-5 tabular-nums",
+                        foraDoMes ? "bg-muted text-muted-foreground" : "bg-primary text-primary-foreground",
+                      )}
+                    >
+                      {n}
                     </span>
-                  </div>
-                  <div className={cn("mt-1 truncate text-lg font-semibold", !ativo(a) && "line-through")}>
-                    {a.clientes?.nome ?? "—"}
-                  </div>
-                  <div className="truncate text-sm text-muted-foreground">
-                    {a.servicos?.nome ?? "Serviço"} · {brl(a.valor_bruto)}
-                  </div>
+                  )}
                 </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+              );
+            })}
+          </div>
+          {isLoading && <Empty>Carregando...</Empty>}
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-1 px-2">
+            <Button variant="ghost" className="h-16 w-10 shrink-0 px-0" aria-label="Semana anterior" onClick={() => setDia(somarDias(dia, -7))}>
+              <ChevronLeft className="size-6" />
+            </Button>
+            <div className="grid flex-1 grid-cols-7 gap-1">
+              {dias.map((d) => {
+                const sel = d === dia;
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDia(d)}
+                    aria-pressed={sel}
+                    aria-label={`${diaPorExtenso(d)}${d === hoje ? " (hoje)" : ""}${comAgenda.has(d) ? ", com agendamentos" : ""}`}
+                    className={cn(
+                      "flex h-16 flex-col items-center justify-center rounded-xl",
+                      sel ? "bg-primary text-primary-foreground shadow-soft" : "active:bg-muted",
+                      d === hoje && !sel && "bg-secondary font-semibold text-primary ring-1 ring-primary",
+                    )}
+                  >
+                    <span className="text-[11px] uppercase tracking-wide">{diaSemanaCurto(d)}</span>
+                    <span className="text-lg font-semibold leading-tight">{diaDoMes(d)}</span>
+                    <span
+                      className={cn(
+                        "mt-0.5 size-1.5 rounded-full",
+                        comAgenda.has(d) ? (sel ? "bg-primary-foreground" : "bg-primary") : "bg-transparent",
+                      )}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+            <Button variant="ghost" className="h-16 w-10 shrink-0 px-0" aria-label="Próxima semana" onClick={() => setDia(somarDias(dia, 7))}>
+              <ChevronRight className="size-6" />
+            </Button>
+          </div>
+
+          <div className="space-y-4 px-5 pt-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-xl">{diaPorExtenso(dia)}</h2>
+              <span className="shrink-0 text-sm text-muted-foreground">{inicioExp}–{fimExp}</span>
+            </div>
+            <Button size="xl" onClick={() => { setEditing(null); setClienteInicial(undefined); setFormOpen(true); }}>
+              <Plus /> Agendar
+            </Button>
+
+            {isLoading ? <Empty>Carregando...</Empty> : doDia.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 rounded-2xl bg-rose-gradient px-5 py-10 text-center">
+                <CalendarDays className="size-8 text-primary" />
+                <p className="font-semibold">Dia livre por enquanto</p>
+                <p className="text-sm text-muted-foreground">Toque em “Agendar” para marcar uma cliente.</p>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {doDia.map((a) => (
+                  <li key={a.id}>
+                    <button
+                      type="button"
+                      onClick={() => setAcoes(a)}
+                      className={cn(
+                        "w-full rounded-2xl border border-l-4 bg-card px-4 py-3 text-left active:bg-muted",
+                        STATUS[a.status].borda,
+                        !ativo(a) && "opacity-50",
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-semibold tabular-nums">{intervalo(a)}</span>
+                        <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", STATUS[a.status].badge)}>
+                          {STATUS[a.status].label}
+                        </span>
+                      </div>
+                      <div className={cn("mt-1 truncate text-lg font-semibold", !ativo(a) && "line-through")}>
+                        {a.clientes?.nome ?? "—"}
+                      </div>
+                      <div className="truncate text-sm text-muted-foreground">
+                        {a.servicos?.nome ?? "Serviço"} · {brl(a.valor_bruto)}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </>
+      )}
 
       <Drawer open={!!acoes} onOpenChange={(o) => !o && setAcoes(null)}>
         <DrawerContent>
