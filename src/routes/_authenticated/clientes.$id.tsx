@@ -20,9 +20,9 @@ import { brl, dataBR } from "@/lib/format";
 export const Route = createFileRoute("/_authenticated/clientes/$id")({
   head: () => ({
     meta: [
-      { title: "Ficha da cliente — Caderno da Nail" },
+      { title: "Ficha da cliente — Lunula" },
       { name: "description", content: "Anamnese e histórico de atendimentos da cliente." },
-      { property: "og:title", content: "Ficha da cliente — Caderno da Nail" },
+      { property: "og:title", content: "Ficha da cliente — Lunula" },
       { property: "og:description", content: "Anamnese e histórico de atendimentos da cliente." },
     ],
   }),

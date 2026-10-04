@@ -15,9 +15,9 @@ import { brl, horaHM } from "@/lib/format";
 export const Route = createFileRoute("/_authenticated/ajustes")({
   head: () => ({
     meta: [
-      { title: "Ajustes — Caderno da Nail" },
+      { title: "Ajustes — Lunula" },
       { name: "description", content: "Percentuais, taxas e serviços." },
-      { property: "og:title", content: "Ajustes — Caderno da Nail" },
+      { property: "og:title", content: "Ajustes — Lunula" },
       { property: "og:description", content: "Percentuais, taxas e serviços." },
     ],
   }),

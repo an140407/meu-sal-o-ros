@@ -21,9 +21,9 @@ export const Route = createFileRoute("/_authenticated/despesas")({
   validateSearch: buscaMes,
   head: () => ({
     meta: [
-      { title: "Despesas — Caderno da Nail" },
+      { title: "Despesas — Lunula" },
       { name: "description", content: "Despesas do mês por categoria." },
-      { property: "og:title", content: "Despesas — Caderno da Nail" },
+      { property: "og:title", content: "Despesas — Lunula" },
       { property: "og:description", content: "Despesas do mês por categoria." },
     ],
   }),

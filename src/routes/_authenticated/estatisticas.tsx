@@ -15,9 +15,9 @@ import { brl, hojeISO, mesAno } from "@/lib/format";
 export const Route = createFileRoute("/_authenticated/estatisticas")({
   head: () => ({
     meta: [
-      { title: "Estatísticas — Caderno da Nail" },
+      { title: "Estatísticas — Lunula" },
       { name: "description", content: "Faturamento, serviços e clientes dos últimos meses." },
-      { property: "og:title", content: "Estatísticas — Caderno da Nail" },
+      { property: "og:title", content: "Estatísticas — Lunula" },
       { property: "og:description", content: "Faturamento, serviços e clientes dos últimos meses." },
     ],
   }),
