@@ -13,10 +13,11 @@ export function normalizarTelefone(telefone: string | null | undefined): string 
 
 export const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? "";
 
-/** Link do WhatsApp com mensagem livre, ou null se o telefone não é válido. */
-export function linkWhatsappTexto(telefone: string | null | undefined, mensagem: string): string | null {
+/** Link do WhatsApp (mensagem opcional), ou null se o telefone não é válido. */
+export function linkWhatsappTexto(telefone: string | null | undefined, mensagem?: string): string | null {
   const tel = normalizarTelefone(telefone);
-  return tel ? `https://wa.me/${tel}?text=${encodeURIComponent(mensagem)}` : null;
+  if (!tel) return null;
+  return mensagem ? `https://wa.me/${tel}?text=${encodeURIComponent(mensagem)}` : `https://wa.me/${tel}`;
 }
 
 export const mensagemRetorno = (nome: string, dias: number) =>

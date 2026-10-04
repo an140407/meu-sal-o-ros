@@ -87,3 +87,24 @@ export const buscaMes = (search: Record<string, unknown>): { mes?: string } => {
   const mes = search["mes"];
   return typeof mes === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(mes) ? { mes } : {};
 };
+
+/**
+ * Valor digitado em reais → número (NaN se inválido). Aceita "90", "90,5", "R$ 90,00",
+ * "1.234,56" e "90.50". Com vírgula, pontos são milhar; sem vírgula, "1.234" é milhar e
+ * "90.5" é decimal.
+ */
+export function parseValor(texto: string | null | undefined): number {
+  const s = (texto ?? "").replace(/R\$/gi, "").replace(/\s/g, "");
+  if (!/^\d[\d.,]*$/.test(s)) return Number.NaN;
+  let normal: string;
+  if (s.includes(",")) {
+    if (!/^\d{1,3}(\.\d{3})*,\d+$|^\d+,\d+$/.test(s)) return Number.NaN;
+    normal = s.replace(/\./g, "").replace(",", ".");
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+    normal = s.replace(/\./g, "");
+  } else {
+    if (!/^\d+(\.\d+)?$/.test(s)) return Number.NaN;
+    normal = s;
+  }
+  return Number(normal);
+}

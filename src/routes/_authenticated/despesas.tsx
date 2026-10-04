@@ -15,7 +15,7 @@ import {
 import { Empty, PageHeader } from "@/components/app/ui-bits";
 import { useDespesas, type Despesa } from "@/lib/data";
 import { CATEGORIAS_DESPESA, SEM_CATEGORIA, resumoDespesas } from "@/lib/despesas";
-import { brl, buscaMes, dataBR, hojeISO, mesAno } from "@/lib/format";
+import { brl, buscaMes, dataBR, hojeISO, mesAno, parseValor } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/despesas")({
   validateSearch: buscaMes,
@@ -140,7 +140,7 @@ function DespesaForm({
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     const desc = descricao.trim().slice(0, 200);
-    const v = Number(valor.replace(",", "."));
+    const v = parseValor(valor);
     if (!desc) return void toast.error("Informe a descrição.");
     if (!Number.isFinite(v) || v <= 0) return void toast.error("Informe um valor maior que zero.");
     if (!data) return void toast.error("Informe a data.");

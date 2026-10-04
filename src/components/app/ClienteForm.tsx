@@ -53,7 +53,8 @@ export function ClienteForm({
         consentimento_data: v.consentimento_data ?? new Date().toISOString(),
       });
     } catch (err) {
-      toast.error((err as Error).message);
+      console.error(err);
+      toast.error("Não foi possível salvar.");
     } finally {
       setSaving(false);
     }

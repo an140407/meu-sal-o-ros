@@ -18,7 +18,7 @@ import { useAtendimentos, useAtendimentosMes, useConfig, useDespesas, useRepasse
 import { saldoPorMes } from "@/lib/acerto";
 import { resumoDespesas } from "@/lib/despesas";
 import { cn } from "@/lib/utils";
-import { brl, buscaMes, dataBR, dataHora, hojeISO, mesAno } from "@/lib/format";
+import { brl, buscaMes, dataBR, dataHora, hojeISO, mesAno, parseValor } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/acerto")({
   validateSearch: buscaMes,
@@ -257,7 +257,7 @@ function RepasseForm({
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
-    const v = Number(valor.replace(",", "."));
+    const v = parseValor(valor);
     if (!Number.isFinite(v) || v <= 0) return void toast.error("Informe um valor válido.");
     if (!data) return void toast.error("Informe a data.");
     setSaving(true);

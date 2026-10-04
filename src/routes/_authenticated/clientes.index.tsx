@@ -16,7 +16,12 @@ import { dataBR, hojeISO, mesAno } from "@/lib/format";
 import { linkWhatsappTexto, mensagemAniversario, mensagemRetorno } from "@/lib/links";
 import { cn } from "@/lib/utils";
 
+const ABAS = ["todas", "retorno", "aniversario"] as const;
+type Aba = (typeof ABAS)[number];
+
 export const Route = createFileRoute("/_authenticated/clientes/")({
+  validateSearch: (s: Record<string, unknown>): { aba?: Aba } =>
+    ABAS.includes(s["aba"] as Aba) ? { aba: s["aba"] as Aba } : {},
   head: () => ({
     meta: [
       { title: "Clientes — Lunula" },
@@ -36,6 +41,7 @@ function Page() {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const aba = Route.useSearch().aba ?? "todas";
   const lista = data.filter((c) => norm(c.nome).includes(norm(busca)));
 
   return (
@@ -45,7 +51,10 @@ function Page() {
           <Plus className="size-6" />
         </Button>
       </PageHeader>
-      <Tabs defaultValue="todas">
+      <Tabs
+        value={aba}
+        onValueChange={(v) => navigate({ to: "/clientes", search: { aba: v as Aba }, replace: true })}
+      >
         <div className="px-5 pb-4">
           <TabsList className="grid h-12 w-full grid-cols-3 rounded-2xl">
             <TabsTrigger value="todas" className="h-10 rounded-xl px-1 text-sm">Todas</TabsTrigger>

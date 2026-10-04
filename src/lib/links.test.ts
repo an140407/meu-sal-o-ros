@@ -116,5 +116,7 @@ describe("mensagens de retorno e aniversário", () => {
     expect(url.pathname).toBe("/5511987654321");
     expect(url.searchParams.get("text")).toBe("Parabéns, Bia! Desejo um dia lindo para você.");
     expect(linkWhatsappTexto("", "oi")).toBeNull();
+    expect(linkWhatsappTexto("(11) 98765-4321")).toBe("https://wa.me/5511987654321");
+    expect(linkWhatsappTexto("(11) 98765-4321", "")).toBe("https://wa.me/5511987654321");
   });
 });

@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "./ui-bits";
 import { ClienteForm, emptyCliente } from "./ClienteForm";
 import { STATUS_ATIVOS, useAgenda, useClientes, useConfig, useServicos, type Atendimento, type Cliente, type Status } from "@/lib/data";
-import { hojeISO, horaAgora, horaHM, minutos } from "@/lib/format";
+import { hojeISO, horaAgora, horaHM, minutos, parseValor } from "@/lib/format";
 import { horariosLivres } from "@/lib/agenda";
 import { cn } from "@/lib/utils";
 
@@ -86,7 +86,7 @@ export function AgendaForm({
     }
   }, [open, editing, dia, horaSugerida, clienteInicial]);
 
-  const v = Number(valor.replace(",", "."));
+  const v = parseValor(valor);
   const dur = Number(duracao);
 
   const { data: cfg } = useConfig();

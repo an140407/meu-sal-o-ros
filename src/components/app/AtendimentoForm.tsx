@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "./ui-bits";
 import { ClienteForm, emptyCliente } from "./ClienteForm";
 import { useClientes, useServicos, type Atendimento } from "@/lib/data";
-import { FORMAS, hojeISO, horaAgora, horaHM, type Forma } from "@/lib/format";
+import { FORMAS, hojeISO, horaAgora, horaHM, parseValor, type Forma } from "@/lib/format";
 
 export function AtendimentoForm({
   open, onOpenChange, editing, clienteFixo,
@@ -31,6 +31,8 @@ export function AtendimentoForm({
   const [clienteId, setClienteId] = useState("");
   const [servicoId, setServicoId] = useState("");
   const [valor, setValor] = useState("");
+  // Sem campo próprio: vem do serviço escolhido e vai no insert (a Agenda usa para ocupar o horário).
+  const [duracao, setDuracao] = useState(60);
   const [data, setData] = useState(hojeISO());
   const [hora, setHora] = useState("");
   const [forma, setForma] = useState<Forma>("pix");
@@ -49,6 +51,7 @@ export function AtendimentoForm({
       setData(editing.data);
       setHora(horaHM(editing.hora));
       setForma(editing.forma_pagamento as Forma);
+      setDuracao(editing.duracao_min);
       setObs(editing.observacoes ?? "");
     } else {
       setClienteId(clienteFixo ?? "");
@@ -57,6 +60,7 @@ export function AtendimentoForm({
       setData(hojeISO());
       setHora(horaAgora());
       setForma("pix");
+      setDuracao(60);
       setObs("");
     }
   }, [open, editing, clienteFixo]);
@@ -67,7 +71,7 @@ export function AtendimentoForm({
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
-    const v = Number(valor.replace(",", "."));
+    const v = parseValor(valor);
     if (!clienteId) return void toast.error("Escolha a cliente.");
     if (!servicoId) return void toast.error("Escolha o serviço.");
     if (!Number.isFinite(v) || v < 0) return void toast.error("Valor inválido.");
@@ -78,7 +82,7 @@ export function AtendimentoForm({
     };
     const { error } = editing
       ? await supabase.from("atendimentos").update(payload).eq("id", editing.id)
-      : await supabase.from("atendimentos").insert({ ...payload, status: "realizado" });
+      : await supabase.from("atendimentos").insert({ ...payload, status: "realizado", duracao_min: duracao });
     setSaving(false);
     if (error) return void toast.error("Não foi possível salvar.");
     toast.success(editing ? "Atendimento atualizado" : "Atendimento registrado");
@@ -148,7 +152,10 @@ export function AtendimentoForm({
                     onChange={(e) => {
                       setServicoId(e.target.value);
                       const s = servicos.find((x) => x.id === e.target.value);
-                      if (s) setValor(String(s.preco_padrao));
+                      if (s) {
+                        setValor(String(s.preco_padrao));
+                        setDuracao(s.duracao_min);
+                      }
                     }}
                   >
                     <option value="">Selecione...</option>

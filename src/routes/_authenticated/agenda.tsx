@@ -15,7 +15,7 @@ import { AtendimentoForm } from "@/components/app/AtendimentoForm";
 import { STATUS_ATIVOS, proximoMes, useAgenda, useClientes, useConfig, type Atendimento, type Status } from "@/lib/data";
 import {
   FORMAS, brl, diaDoMes, diaPorExtenso, diaSemanaCurto, hojeISO, horaDeMinutos, horaHM,
-  inicioSemana, mesAno, minutos, somarDias, type Forma,
+  inicioSemana, mesAno, minutos, parseValor, somarDias, type Forma,
 } from "@/lib/format";
 import { gradeMes } from "@/lib/agenda";
 import { linkGoogleAgenda, linkWhatsapp } from "@/lib/links";
@@ -125,9 +125,14 @@ function Page() {
     abrir(url);
   }
 
+  const [mudandoStatus, setMudandoStatus] = useState(false);
+
   async function mudarStatus(a: Atendimento, status: Status, msg: string) {
+    if (mudandoStatus) return;
+    setMudandoStatus(true);
     const patch: TablesUpdate<"atendimentos"> & { status: Status } = { status };
     const { error } = await supabase.from("atendimentos").update(patch).eq("id", a.id);
+    setMudandoStatus(false);
     if (error) return void toast.error("Não foi possível salvar.");
     setAcoes(null);
     qc.invalidateQueries({ queryKey: ["atendimentos"] });
@@ -319,19 +324,22 @@ function Page() {
                     <Button size="xl" variant="outline" onClick={() => confirmarWhatsapp(acoes)}><MessageCircle /> Confirmar por WhatsApp</Button>
                     <Button size="xl" variant="outline" onClick={() => adicionarGoogleAgenda(acoes)}><CalendarPlus /> Adicionar ao Google Agenda</Button>
                     <div className="grid grid-cols-2 gap-3">
-                      <Button variant="outline" className="h-14 rounded-2xl text-base" onClick={() => mudarStatus(acoes, "faltou", "Marcado como falta")}><UserX /> Faltou</Button>
-                      <Button variant="outline" className="h-14 rounded-2xl text-base text-destructive" onClick={() => mudarStatus(acoes, "cancelado", "Agendamento cancelado")}><Ban /> Cancelar</Button>
+                      <Button variant="outline" className="h-14 rounded-2xl text-base" disabled={mudandoStatus} onClick={() => mudarStatus(acoes, "faltou", "Marcado como falta")}><UserX /> Faltou</Button>
+                      <Button variant="outline" className="h-14 rounded-2xl text-base text-destructive" disabled={mudandoStatus} onClick={() => mudarStatus(acoes, "cancelado", "Agendamento cancelado")}><Ban /> Cancelar</Button>
                     </div>
                   </>
                 )}
                 {(acoes.status === "cancelado" || acoes.status === "faltou") && (
                   <>
-                    <Button size="xl" onClick={() => mudarStatus(acoes, "agendado", "Voltou para agendado")}><RotateCcw /> Voltar para agendado</Button>
+                    <Button size="xl" disabled={mudandoStatus} onClick={() => mudarStatus(acoes, "agendado", "Voltou para agendado")}><RotateCcw /> Voltar para agendado</Button>
                     <Button size="xl" variant="secondary" onClick={() => { setEditing(acoes); setAcoes(null); setFormOpen(true); }}><Pencil /> Editar</Button>
                   </>
                 )}
                 {acoes.status === "realizado" && (
-                  <Button size="xl" variant="secondary" onClick={() => { setEditRealizado(acoes); setAcoes(null); }}><Pencil /> Editar atendimento</Button>
+                  <>
+                    <Button size="xl" variant="secondary" onClick={() => { setEditRealizado(acoes); setAcoes(null); }}><Pencil /> Editar atendimento</Button>
+                    <Button size="xl" variant="outline" disabled={mudandoStatus} onClick={() => mudarStatus(acoes, "agendado", "Voltou para agendado")}><RotateCcw /> Voltar para agendado</Button>
+                  </>
                 )}
               </div>
             </>
@@ -361,7 +369,7 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     if (!atendimento) return;
-    const v = Number(valor.replace(",", "."));
+    const v = parseValor(valor);
     if (!Number.isFinite(v) || v < 0) return void toast.error("Valor inválido.");
     if (!forma) return void toast.error("Escolha a forma de pagamento.");
     setSaving(true);

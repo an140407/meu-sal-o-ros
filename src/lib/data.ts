@@ -27,9 +27,10 @@ export const useClientes = () =>
   useQuery({
     queryKey: ["clientes"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("clientes").select("*").order("nome");
+      const { data, error } = await supabase.from("clientes").select("*");
       if (error) throw error;
-      return data;
+      // Ordena no cliente: ignora acentos e maiúsculas ("Ágata" junto de "Ana").
+      return data.sort((a: Cliente, b: Cliente) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
     },
   });
 
@@ -111,6 +112,24 @@ export const useAtendimentosMes = (mes: string) =>
         .order("data")
         .order("hora", { nullsFirst: false })
         .order("created_at");
+      if (error) throw error;
+      return data as Atendimento[];
+    },
+  });
+
+/** Agendamentos 'agendado' da cliente de `hoje` em diante, em ordem cronológica. */
+export const useProximosDaCliente = (clienteId: string, hoje: string) =>
+  useQuery({
+    queryKey: ["atendimentos", "proximos", clienteId, hoje],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("atendimentos")
+        .select("*, clientes(nome), servicos(nome)")
+        .eq("cliente_id", clienteId)
+        .eq("status", "agendado")
+        .gte("data", hoje)
+        .order("data")
+        .order("hora", { nullsFirst: false });
       if (error) throw error;
       return data as Atendimento[];
     },

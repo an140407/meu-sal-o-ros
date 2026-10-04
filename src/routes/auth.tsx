@@ -100,11 +100,11 @@ function AuthPage() {
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
-              <Input id="email" type="email" required className="h-12" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input id="email" type="email" autoComplete="email" required className="h-12" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="senha">Senha</Label>
-              <Input id="senha" type="password" required minLength={6} className="h-12" value={senha} onChange={(e) => setSenha(e.target.value)} />
+              <Input id="senha" type="password" autoComplete="current-password" required minLength={6} className="h-12" value={senha} onChange={(e) => setSenha(e.target.value)} />
             </div>
             <Button type="submit" size="xl" variant="outline" disabled={loading}>
               {loading ? "Aguarde..." : "Entrar com e-mail"}

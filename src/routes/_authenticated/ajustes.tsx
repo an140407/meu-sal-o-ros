@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/app/ui-bits";
 import { useConfig, useServicos } from "@/lib/data";
-import { brl, horaHM } from "@/lib/format";
+import { brl, horaHM, parseValor } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/ajustes")({
   head: () => ({
@@ -34,6 +34,8 @@ function Page() {
     hora_inicio: "08:00", hora_fim: "19:00",
   });
   const [novo, setNovo] = useState({ nome: "", preco: "" });
+  const [salvando, setSalvando] = useState(false);
+  const { user } = Route.useRouteContext();
 
   useEffect(() => {
     if (cfg) setF({
@@ -51,11 +53,13 @@ function Page() {
     if (vals.some((v) => !Number.isFinite(v) || v < 0 || v > 100)) return void toast.error("Use percentuais entre 0 e 100.");
     if (!f.hora_inicio || !f.hora_fim || f.hora_fim <= f.hora_inicio) return void toast.error("O fim do expediente deve ser depois do início.");
     if (!cfg) return;
+    setSalvando(true);
     const { error } = await supabase.from("configuracoes").update({
       percentual_ana: vals[0], taxa_debito: vals[1], taxa_credito: vals[2],
       nome_dona: f.nome_dona.trim().slice(0, 60) || "Simone",
       hora_inicio: f.hora_inicio, hora_fim: f.hora_fim,
     }).eq("user_id", cfg.user_id);
+    setSalvando(false);
     if (error) return void toast.error("Não foi possível salvar.");
     qc.invalidateQueries({ queryKey: ["config"] });
     toast.success("Ajustes salvos. Valem para os próximos atendimentos.");
@@ -63,7 +67,7 @@ function Page() {
 
   async function addServico(e: React.FormEvent) {
     e.preventDefault();
-    const preco = num(novo.preco || "0");
+    const preco = parseValor(novo.preco || "0");
     if (!novo.nome.trim() || !Number.isFinite(preco) || preco < 0) return void toast.error("Preencha nome e preço.");
     const { error } = await supabase.from("servicos").insert({ nome: novo.nome.trim().slice(0, 80), preco_padrao: preco });
     if (error) return void toast.error("Não foi possível adicionar.");
@@ -113,7 +117,7 @@ function Page() {
             {horaField("hora_inicio", "Início do expediente")}
             {horaField("hora_fim", "Fim do expediente")}
           </div>
-          <Button type="submit" size="xl">Salvar</Button>
+          <Button type="submit" size="xl" disabled={salvando}>{salvando ? "Salvando..." : "Salvar"}</Button>
         </form>
 
         <section className="space-y-3 rounded-2xl border bg-card p-4">
@@ -137,7 +141,7 @@ function Page() {
                       defaultValue={String(s.preco_padrao)}
                       aria-label={`Preço de ${s.nome}`}
                       onBlur={(e) => {
-                        const v = num(e.target.value);
+                        const v = parseValor(e.target.value);
                         if (Number.isFinite(v) && v >= 0 && v !== Number(s.preco_padrao)) updServico(s.id, { preco_padrao: v });
                       }}
                     />
@@ -179,7 +183,14 @@ function Page() {
           <ChevronRight className="size-5 text-muted-foreground" />
         </Link>
 
-        <Button variant="outline" className="h-12 w-full rounded-2xl" onClick={sair}><LogOut /> Sair</Button>
+        <div className="space-y-2">
+          {user.email && (
+            <p className="text-center text-sm text-muted-foreground">
+              Conectada como <span className="font-medium text-foreground">{user.email}</span>
+            </p>
+          )}
+          <Button variant="outline" className="h-12 w-full rounded-2xl" onClick={sair}><LogOut /> Sair</Button>
+        </div>
       </div>
     </>
   );
