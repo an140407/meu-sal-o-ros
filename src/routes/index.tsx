@@ -5,9 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Caderno da Nail — clientes e atendimentos" },
+      { title: "Lunula — clientes e atendimentos" },
       { name: "description", content: "Registre clientes, anamnese e atendimentos de nail design." },
-      { property: "og:title", content: "Caderno da Nail" },
+      { property: "og:title", content: "Lunula" },
       { property: "og:description", content: "Registre clientes, anamnese e atendimentos de nail design." },
     ],
   }),
@@ -23,7 +23,7 @@ function Index() {
   }, [navigate]);
   return (
     <main className="flex min-h-screen items-center justify-center bg-rose-gradient">
-      <h1 className="text-3xl text-foreground">Caderno da Nail</h1>
+      <h1 className="text-3xl text-foreground">Lunula</h1>
     </main>
   );
 }

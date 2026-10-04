@@ -10,9 +10,9 @@ import { Label } from "@/components/ui/label";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Entrar — Caderno da Nail" },
+      { title: "Entrar — Lunula" },
       { name: "description", content: "Acesse seu caderno de clientes e atendimentos." },
-      { property: "og:title", content: "Entrar — Caderno da Nail" },
+      { property: "og:title", content: "Entrar — Lunula" },
       { property: "og:description", content: "Acesse seu caderno de clientes e atendimentos." },
     ],
   }),
@@ -88,8 +88,8 @@ function AuthPage() {
   return (
     <main className="min-h-screen bg-rose-gradient flex flex-col justify-center px-6 py-10">
       <div className="mx-auto w-full max-w-sm">
-        <h1 className="text-4xl text-foreground">Caderno da Nail</h1>
-        <p className="mt-2 text-muted-foreground">Clientes e atendimentos, num só lugar.</p>
+        <h1 className="text-4xl text-foreground">Lunula</h1>
+        <p className="mt-2 text-muted-foreground">Agenda, clientes e acerto num só lugar.</p>
         <div className="mt-8 space-y-4 rounded-3xl bg-card p-6 shadow-soft">
           <Button type="button" size="xl" onClick={entrarGoogle} disabled={googleLoading}>
             <GoogleIcon /> {googleLoading ? "Aguarde..." : "Continuar com o Google"}

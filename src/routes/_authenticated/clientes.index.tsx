@@ -19,9 +19,9 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/clientes/")({
   head: () => ({
     meta: [
-      { title: "Clientes — Caderno da Nail" },
+      { title: "Clientes — Lunula" },
       { name: "description", content: "Lista e busca de clientes." },
-      { property: "og:title", content: "Clientes — Caderno da Nail" },
+      { property: "og:title", content: "Clientes — Lunula" },
       { property: "og:description", content: "Lista e busca de clientes." },
     ],
   }),

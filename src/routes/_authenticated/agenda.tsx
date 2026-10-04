@@ -27,9 +27,9 @@ export const Route = createFileRoute("/_authenticated/agenda")({
     typeof s["cliente"] === "string" && s["cliente"] ? { cliente: s["cliente"] } : {},
   head: () => ({
     meta: [
-      { title: "Agenda — Caderno da Nail" },
+      { title: "Agenda — Lunula" },
       { name: "description", content: "Agendamentos do dia e da semana." },
-      { property: "og:title", content: "Agenda — Caderno da Nail" },
+      { property: "og:title", content: "Agenda — Lunula" },
       { property: "og:description", content: "Agendamentos do dia e da semana." },
     ],
   }),

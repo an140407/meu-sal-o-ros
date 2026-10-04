@@ -24,9 +24,9 @@ export const Route = createFileRoute("/_authenticated/acerto")({
   validateSearch: buscaMes,
   head: () => ({
     meta: [
-      { title: "Acerto do mês — Caderno da Nail" },
+      { title: "Acerto do mês — Lunula" },
       { name: "description", content: "Divisão do mês, repasses e saldo a receber." },
-      { property: "og:title", content: "Acerto do mês — Caderno da Nail" },
+      { property: "og:title", content: "Acerto do mês — Lunula" },
       { property: "og:description", content: "Divisão do mês, repasses e saldo a receber." },
     ],
   }),

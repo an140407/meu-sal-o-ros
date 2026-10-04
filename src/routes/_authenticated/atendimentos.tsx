@@ -10,9 +10,9 @@ import { useAtendimentos, useConfig, type Atendimento } from "@/lib/data";
 export const Route = createFileRoute("/_authenticated/atendimentos")({
   head: () => ({
     meta: [
-      { title: "Atendimentos — Caderno da Nail" },
+      { title: "Atendimentos — Lunula" },
       { name: "description", content: "Atendimentos registrados por mês." },
-      { property: "og:title", content: "Atendimentos — Caderno da Nail" },
+      { property: "og:title", content: "Atendimentos — Lunula" },
       { property: "og:description", content: "Atendimentos registrados por mês." },
     ],
   }),
