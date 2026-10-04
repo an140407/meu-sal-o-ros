@@ -15,6 +15,13 @@
       "when": 1791003635430,
       "tag": "0001_restrict_cliente_e_repasses",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791102052295,
+      "tag": "0002_atendimento_hora",
+      "breakpoints": true
     }
   ]
 }

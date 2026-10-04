@@ -20,6 +20,7 @@ export type Database = {
           created_at: string
           data: string
           forma_pagamento: string
+          hora: string | null
           id: string
           observacoes: string | null
           percentual_ana: number
@@ -34,6 +35,7 @@ export type Database = {
           created_at?: string
           data?: string
           forma_pagamento: string
+          hora?: string | null
           id?: string
           observacoes?: string | null
           percentual_ana?: number
@@ -48,6 +50,7 @@ export type Database = {
           created_at?: string
           data?: string
           forma_pagamento?: string
+          hora?: string | null
           id?: string
           observacoes?: string | null
           percentual_ana?: number
