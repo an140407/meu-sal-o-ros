@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Ban, CalendarDays, Check, ChevronLeft, ChevronRight, Pencil, Plus, RotateCcw, UserX } from "lucide-react";
+import { Ban, CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, MessageCircle, Pencil, Plus, RotateCcw, UserX } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   FORMAS, brl, diaDoMes, diaPorExtenso, diaSemanaCurto, hojeISO, horaDeMinutos, horaHM,
   inicioSemana, minutos, somarDias, type Forma,
 } from "@/lib/format";
+import { linkGoogleAgenda, linkWhatsapp } from "@/lib/links";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/agenda")({
@@ -69,6 +70,35 @@ function Page() {
     minutos(inicioExp),
   );
   const horaSugerida = ultimoFim < minutos(fimExp) ? horaDeMinutos(ultimoFim) : inicioExp;
+
+  const abrir = (url: string) => window.open(url, "_blank", "noopener,noreferrer");
+
+  function confirmarWhatsapp(a: Atendimento) {
+    const cliente = clientes.find((c) => c.id === a.cliente_id);
+    const url = linkWhatsapp({
+      telefone: cliente?.telefone,
+      cliente: a.clientes?.nome ?? cliente?.nome ?? "",
+      servico: a.servicos?.nome ?? "Serviço",
+      data: a.data,
+      hora: a.hora,
+    });
+    if (!url) return void toast.error("Cliente sem telefone válido");
+    abrir(url);
+  }
+
+  function adicionarGoogleAgenda(a: Atendimento) {
+    // Só observações do agendamento; nada da anamnese vai para o Google.
+    const url = linkGoogleAgenda({
+      servico: a.servicos?.nome ?? "Serviço",
+      cliente: a.clientes?.nome ?? "—",
+      data: a.data,
+      hora: a.hora,
+      duracaoMin: a.duracao_min,
+      observacoes: a.observacoes,
+    });
+    if (!url) return void toast.error("Agendamento sem horário");
+    abrir(url);
+  }
 
   async function mudarStatus(a: Atendimento, status: Status, msg: string) {
     const patch: TablesUpdate<"atendimentos"> & { status: Status } = { status };
@@ -195,6 +225,8 @@ function Page() {
                   <>
                     <Button size="xl" onClick={() => { setConcluir(acoes); setAcoes(null); }}><Check /> Concluir</Button>
                     <Button size="xl" variant="secondary" onClick={() => { setEditing(acoes); setAcoes(null); setFormOpen(true); }}><Pencil /> Editar</Button>
+                    <Button size="xl" variant="outline" onClick={() => confirmarWhatsapp(acoes)}><MessageCircle /> Confirmar por WhatsApp</Button>
+                    <Button size="xl" variant="outline" onClick={() => adicionarGoogleAgenda(acoes)}><CalendarPlus /> Adicionar ao Google Agenda</Button>
                     <div className="grid grid-cols-2 gap-3">
                       <Button variant="outline" className="h-14 rounded-2xl text-base" onClick={() => mudarStatus(acoes, "faltou", "Marcado como falta")}><UserX /> Faltou</Button>
                       <Button variant="outline" className="h-14 rounded-2xl text-base text-destructive" onClick={() => mudarStatus(acoes, "cancelado", "Agendamento cancelado")}><Ban /> Cancelar</Button>

@@ -60,6 +60,8 @@ const DIAS_CURTOS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 export const diaSemanaCurto = (iso: string) => DIAS_CURTOS[calendario(iso).getUTCDay()];
 export const diaDoMes = (iso: string) => partes(iso)[2];
+/** "Segunda", "Terça"... */
+export const diaSemana = (iso: string) => DIAS[calendario(iso).getUTCDay()]!;
 /** "Segunda, 5 de outubro" */
 export const diaPorExtenso = (iso: string) => {
   const [, m, d] = partes(iso);
