@@ -20,6 +20,7 @@ export type Database = {
           created_at: string
           data: string
           forma_pagamento: string
+          hora: string | null
           id: string
           observacoes: string | null
           percentual_ana: number
@@ -34,6 +35,7 @@ export type Database = {
           created_at?: string
           data?: string
           forma_pagamento: string
+          hora?: string | null
           id?: string
           observacoes?: string | null
           percentual_ana?: number
@@ -48,6 +50,7 @@ export type Database = {
           created_at?: string
           data?: string
           forma_pagamento?: string
+          hora?: string | null
           id?: string
           observacoes?: string | null
           percentual_ana?: number
@@ -146,6 +149,36 @@ export type Database = {
           taxa_credito?: number
           taxa_debito?: number
           user_id?: string
+        }
+        Relationships: []
+      }
+      repasses: {
+        Row: {
+          created_at: string | null
+          data_recebimento: string
+          id: string
+          mes_referencia: string
+          observacao: string | null
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string | null
+          data_recebimento?: string
+          id?: string
+          mes_referencia: string
+          observacao?: string | null
+          user_id?: string
+          valor: number
+        }
+        Update: {
+          created_at?: string | null
+          data_recebimento?: string
+          id?: string
+          mes_referencia?: string
+          observacao?: string | null
+          user_id?: string
+          valor?: number
         }
         Relationships: []
       }

@@ -42,8 +42,8 @@ export function ClienteForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const r = schema.safeParse({ nome: v.nome ?? "", telefone: v.telefone ?? "" });
-    if (!r.success) return toast.error(r.error.issues[0].message);
-    if (!v.consentimento_lgpd) return toast.error("O consentimento da cliente é obrigatório.");
+    if (!r.success) return void toast.error(r.error.issues[0]?.message ?? "Dados inválidos");
+    if (!v.consentimento_lgpd) return void toast.error("O consentimento da cliente é obrigatório.");
     setSaving(true);
     try {
       await onSubmit({

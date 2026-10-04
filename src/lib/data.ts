@@ -57,10 +57,50 @@ export const useAtendimentos = (clienteId?: string) =>
         .from("atendimentos")
         .select("*, clientes(nome), servicos(nome)")
         .order("data", { ascending: false })
+        .order("hora", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false });
       if (clienteId) q = q.eq("cliente_id", clienteId);
       const { data, error } = await q;
       if (error) throw error;
       return data as Atendimento[];
+    },
+  });
+
+export type Repasse = Tables<"repasses">;
+
+const proximoMes = (mes: string) => {
+  const [y, m] = mes.split("-").map(Number) as [number, number];
+  return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+};
+
+export const useAtendimentosMes = (mes: string) =>
+  useQuery({
+    queryKey: ["atendimentos", "mes", mes],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("atendimentos")
+        .select("*, clientes(nome), servicos(nome)")
+        .gte("data", `${mes}-01`)
+        .lt("data", proximoMes(mes))
+        .order("data")
+        .order("hora", { nullsFirst: false })
+        .order("created_at");
+      if (error) throw error;
+      return data as Atendimento[];
+    },
+  });
+
+export const useRepasses = (mes: string) =>
+  useQuery({
+    queryKey: ["repasses", mes],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("repasses")
+        .select("*")
+        .eq("mes_referencia", mes)
+        .order("data_recebimento")
+        .order("created_at");
+      if (error) throw error;
+      return data;
     },
   });

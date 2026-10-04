@@ -30,3 +30,11 @@ export const FORMAS = [
 ] as const;
 export type Forma = (typeof FORMAS)[number]["value"];
 export const formaLabel = (f: string) => FORMAS.find((x) => x.value === f)?.label ?? f;
+
+export const horaAgora = () => {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+export const horaHM = (h: string | null | undefined) => (h ? h.slice(0, 5) : "");
+export const dataHora = (iso: string, h?: string | null) => (h ? `${dataBR(iso)} ${horaHM(h)}` : dataBR(iso));
