@@ -110,15 +110,21 @@ function Page() {
               <h2 className="text-xl">Próximos</h2>
               <ul className="divide-y overflow-hidden rounded-2xl border border-l-4 border-l-sky-400 bg-card">
                 {proximos.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <div className="min-w-0">
-                      <div className="font-semibold">{diaPorExtenso(a.data)}</div>
-                      <div className="truncate text-sm text-muted-foreground">
-                        {a.hora ? `${horaHM(a.hora)}–${horaDeMinutos(minutos(a.hora) + a.duracao_min)} · ` : ""}
-                        {a.servicos?.nome ?? "Serviço"}
+                  <li key={a.id}>
+                    <Link
+                      to="/agenda"
+                      search={{ dia: a.data }}
+                      className="flex items-center justify-between gap-3 px-4 py-3 active:bg-muted"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-semibold">{diaPorExtenso(a.data)}</div>
+                        <div className="truncate text-sm text-muted-foreground">
+                          {a.hora ? `${horaHM(a.hora)}–${horaDeMinutos(minutos(a.hora) + a.duracao_min)} · ` : ""}
+                          {a.servicos?.nome ?? "Serviço"}
+                        </div>
                       </div>
-                    </div>
-                    <div className="shrink-0 font-semibold">{brl(a.valor_bruto)}</div>
+                      <div className="shrink-0 font-semibold">{brl(a.valor_bruto)}</div>
+                    </Link>
                   </li>
                 ))}
               </ul>

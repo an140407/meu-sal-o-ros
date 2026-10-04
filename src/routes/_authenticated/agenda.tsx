@@ -23,8 +23,15 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/agenda")({
   // ?cliente=<id> abre "Agendar" com a cliente pré-selecionada (vindo de Clientes › Para retorno).
-  validateSearch: (s: Record<string, unknown>): { cliente?: string } =>
-    typeof s["cliente"] === "string" && s["cliente"] ? { cliente: s["cliente"] } : {},
+  // ?dia=YYYY-MM-DD abre a visão de Dia nesse dia (vindo da ficha da cliente › Próximos).
+  validateSearch: (s: Record<string, unknown>): { cliente?: string; dia?: string } => {
+    const cliente = s["cliente"];
+    const dia = s["dia"];
+    return {
+      ...(typeof cliente === "string" && cliente ? { cliente } : {}),
+      ...(typeof dia === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dia) && somarDias(dia, 0) === dia ? { dia } : {}),
+    };
+  },
   head: () => ({
     meta: [
       { title: "Agenda — Lunula" },
@@ -70,17 +77,23 @@ function Page() {
   const [concluir, setConcluir] = useState<Atendimento | null>(null);
   const [editRealizado, setEditRealizado] = useState<Atendimento | null>(null);
   const [clienteInicial, setClienteInicial] = useState<string>();
-  const { cliente: clienteBusca } = Route.useSearch();
+  const { cliente: clienteBusca, dia: diaBusca } = Route.useSearch();
   const navigate = Route.useNavigate();
 
   useEffect(() => {
-    if (!clienteBusca) return;
-    setClienteInicial(clienteBusca);
-    setEditing(null);
-    setFormOpen(true);
-    // Limpa a URL para não reabrir o formulário ao recarregar.
+    if (!clienteBusca && !diaBusca) return;
+    if (diaBusca) {
+      setDia(diaBusca);
+      setVisao("dia");
+    }
+    if (clienteBusca) {
+      setClienteInicial(clienteBusca);
+      setEditing(null);
+      setFormOpen(true);
+    }
+    // Limpa a URL para não reaplicar ao recarregar.
     navigate({ search: {}, replace: true });
-  }, [clienteBusca, navigate]);
+  }, [clienteBusca, diaBusca, navigate]);
 
   const comAgenda = new Set(semana.filter(ativo).map((a) => a.data));
   const ativosPorDia = new Map<string, number>();
