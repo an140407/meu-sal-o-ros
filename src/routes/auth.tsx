@@ -36,6 +36,7 @@ function AuthPage() {
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [mostrarEmail, setMostrarEmail] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -94,22 +95,34 @@ function AuthPage() {
           <Button type="button" size="xl" onClick={entrarGoogle} disabled={googleLoading}>
             <GoogleIcon /> {googleLoading ? "Aguarde..." : "Continuar com o Google"}
           </Button>
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <div className="h-px flex-1 bg-border" /> ou <div className="h-px flex-1 bg-border" />
-          </div>
-          <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input id="email" type="email" autoComplete="email" required className="h-12" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="senha">Senha</Label>
-              <Input id="senha" type="password" autoComplete="current-password" required minLength={6} className="h-12" value={senha} onChange={(e) => setSenha(e.target.value)} />
-            </div>
-            <Button type="submit" size="xl" variant="outline" disabled={loading}>
-              {loading ? "Aguarde..." : "Entrar com e-mail"}
-            </Button>
-          </form>
+          {!mostrarEmail ? (
+            <button
+              type="button"
+              onClick={() => setMostrarEmail(true)}
+              className="block h-11 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
+              Entrar com e-mail
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <div className="h-px flex-1 bg-border" /> ou <div className="h-px flex-1 bg-border" />
+              </div>
+              <form onSubmit={submit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">E-mail</Label>
+                  <Input id="email" type="email" autoComplete="email" required className="h-12" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="senha">Senha</Label>
+                  <Input id="senha" type="password" autoComplete="current-password" required minLength={6} className="h-12" value={senha} onChange={(e) => setSenha(e.target.value)} />
+                </div>
+                <Button type="submit" size="xl" variant="outline" disabled={loading}>
+                  {loading ? "Aguarde..." : "Entrar com e-mail"}
+                </Button>
+              </form>
+            </>
+          )}
         </div>
       </div>
     </main>
