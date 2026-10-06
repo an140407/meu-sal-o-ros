@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, UserPlus } from "lucide-react";
+import { AlertTriangle, Trash2, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import {
@@ -62,6 +62,8 @@ export function AgendaForm({
   const [obs, setObs] = useState("");
   const [novoCliente, setNovoCliente] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
   const [confirmSobreposicao, setConfirmSobreposicao] = useState(false);
 
   useEffect(() => {
@@ -126,6 +128,19 @@ export function AgendaForm({
       return void setConfirmSobreposicao(true);
     }
     await gravar();
+  }
+
+  async function excluir() {
+    if (!editing) return;
+    setExcluindo(true);
+    // Os serviços do atendimento são apagados junto pelo banco.
+    const { error } = await supabase.from("atendimentos").delete().eq("id", editing.id);
+    setExcluindo(false);
+    if (error) return void toast.error("Não foi possível excluir.");
+    toast.success("Excluído");
+    qc.invalidateQueries({ queryKey: ["atendimentos"] });
+    setConfirmDel(false);
+    onOpenChange(false);
   }
 
   async function gravar() {
@@ -233,7 +248,12 @@ export function AgendaForm({
                   <Label>Observações</Label>
                   <Textarea value={obs} onChange={(e) => setObs(e.target.value)} maxLength={1000} className="text-base" />
                 </div>
-                <Button type="submit" size="xl" disabled={saving}>{saving ? "Salvando..." : editing ? "Salvar" : "Agendar"}</Button>
+                <Button type="submit" size="xl" disabled={saving || excluindo}>{saving ? "Salvando..." : editing ? "Salvar" : "Agendar"}</Button>
+                {editing && (
+                  <Button type="button" variant="ghost" className="h-12 w-full text-destructive" disabled={excluindo} onClick={() => setConfirmDel(true)}>
+                    <Trash2 /> {editing.status === "realizado" ? "Excluir atendimento" : "Excluir agendamento"}
+                  </Button>
+                )}
               </form>
             )}
           </div>
@@ -248,6 +268,31 @@ export function AgendaForm({
           <AlertDialogFooter>
             <AlertDialogCancel>Voltar</AlertDialogCancel>
             <AlertDialogAction onClick={gravar} disabled={saving}>Agendar mesmo assim</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={confirmDel} onOpenChange={(o) => !excluindo && setConfirmDel(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir agendamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {editing?.status === "realizado"
+                ? "Essa ação não pode ser desfeita e o atendimento sai do Acerto."
+                : "Essa ação não pode ser desfeita. Se a cliente desmarcou, prefira Cancelar, que mantém o histórico."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluindo}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={excluindo}
+              onClick={(e) => {
+                // Mantém o diálogo aberto até terminar de excluir.
+                e.preventDefault();
+                void excluir();
+              }}
+            >
+              {excluindo ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
