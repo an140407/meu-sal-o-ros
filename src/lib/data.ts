@@ -230,7 +230,7 @@ export const useRepasses = (mes: string) =>
 /**
  * Grava o atendimento e seus serviços. Nunca grava valor_bruto: o banco soma os itens.
  * servico_id = serviço do 1º item (compatibilidade); duracao_min = soma, limitada a 15–480.
- * Ordem: atendimento → insere os itens novos numa chamada → apaga os antigos pelos ids → relê.
+ * Ordem: atendimento → troca os itens numa transação (rpc substituir_itens_atendimento) → relê.
  */
 export async function salvarAtendimentoComItens(
   id: string | null,
@@ -242,13 +242,9 @@ export async function salvarAtendimentoComItens(
   const linha = { ...campos, servico_id: itens[0]!.servico_id, duracao_min: duracao };
 
   let atendimentoId = id;
-  let antigos: string[] = [];
   if (id) {
     const { error } = await supabase.from("atendimentos").update(linha).eq("id", id);
     if (error) throw error;
-    const { data: velhos, error: e } = await supabase.from("atendimento_servicos").select("id").eq("atendimento_id", id);
-    if (e) throw e;
-    antigos = velhos.map((v: { id: string }) => v.id);
   } else {
     const { data: criado, error } = await supabase
       .from("atendimentos")
@@ -259,19 +255,15 @@ export async function salvarAtendimentoComItens(
     atendimentoId = criado.id;
   }
 
-  const { error: eItens } = await supabase.from("atendimento_servicos").insert(
-    itens.map((i, ordem) => ({
-      atendimento_id: atendimentoId!, servico_id: i.servico_id, nome: i.nome, valor: i.valor, duracao_min: i.duracao_min, ordem,
-    })),
-  );
+  // Apaga os itens antigos e insere os novos numa única transação; a ordem é a posição na lista.
+  const { error: eItens } = await supabase.rpc("substituir_itens_atendimento", {
+    p_atendimento_id: atendimentoId!,
+    p_itens: itens.map((i) => ({ servico_id: i.servico_id, nome: i.nome, valor: i.valor, duracao_min: i.duracao_min })),
+  });
   if (eItens) {
     // Atendimento novo sem itens ficaria órfão (valor 0): desfaz o que acabou de ser criado.
     if (!id) await supabase.from("atendimentos").delete().eq("id", atendimentoId!);
     throw eItens;
-  }
-  if (antigos.length > 0) {
-    const { error } = await supabase.from("atendimento_servicos").delete().in("id", antigos);
-    if (error) throw error;
   }
 
   const { data: lido, error: eLer } = await supabase

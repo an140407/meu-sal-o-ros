@@ -308,6 +308,10 @@ export type Database = {
     }
     Functions: {
       garantir_setup: { Args: never; Returns: undefined }
+      substituir_itens_atendimento: {
+        Args: { p_atendimento_id: string; p_itens: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
