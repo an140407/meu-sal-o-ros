@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      atendimento_servicos: {
+        Row: {
+          atendimento_id: string
+          created_at: string
+          duracao_min: number
+          id: string
+          nome: string
+          ordem: number
+          servico_id: string | null
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          atendimento_id: string
+          created_at?: string
+          duracao_min?: number
+          id?: string
+          nome: string
+          ordem?: number
+          servico_id?: string | null
+          user_id?: string
+          valor?: number
+        }
+        Update: {
+          atendimento_id?: string
+          created_at?: string
+          duracao_min?: number
+          id?: string
+          nome?: string
+          ordem?: number
+          servico_id?: string | null
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atendimento_servicos_atendimento_id_fkey"
+            columns: ["atendimento_id"]
+            isOneToOne: false
+            referencedRelation: "atendimentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atendimento_servicos_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atendimentos: {
         Row: {
           cliente_id: string

@@ -17,6 +17,7 @@ import { PageHeader, Empty } from "@/components/app/ui-bits";
 import { useAtendimentos, useAtendimentosMes, useConfig, useDespesas, useRepasses, useRepassesTodos, type Repasse } from "@/lib/data";
 import { saldoPorMes } from "@/lib/acerto";
 import { resumoDespesas } from "@/lib/despesas";
+import { nomesItens } from "@/lib/itens";
 import { cn } from "@/lib/utils";
 import { brl, buscaMes, dataBR, dataHora, hojeISO, mesAno, parseValor } from "@/lib/format";
 
@@ -62,7 +63,7 @@ function Page() {
     const linhas = [
       `Acerto ${mesAno(mes)}`,
       "",
-      ...atends.map((a) => `${dataHora(a.data, a.hora)} - ${a.clientes?.nome ?? "—"} - ${a.servicos?.nome ?? "Serviço"} - ${brl(a.valor_bruto)}`),
+      ...atends.map((a) => `${dataHora(a.data, a.hora)} - ${a.clientes?.nome ?? "—"} - ${nomesItens(a.itens)} - ${brl(a.valor_bruto)}`),
       "",
       `Total bruto: ${brl(bruto)}`,
       `Taxas: ${brl(taxas)}`,

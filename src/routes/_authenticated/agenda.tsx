@@ -6,16 +6,19 @@ import { Ban, CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Mess
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { PageHeader, Empty } from "@/components/app/ui-bits";
 import { AgendaForm, AvisoSaude } from "@/components/app/AgendaForm";
 import { AtendimentoForm } from "@/components/app/AtendimentoForm";
-import { STATUS_ATIVOS, proximoMes, useAgenda, useClientes, useConfig, type Atendimento, type Status } from "@/lib/data";
+import { ServicosPicker } from "@/components/app/ServicosPicker";
+import {
+  STATUS_ATIVOS, proximoMes, salvarAtendimentoComItens, useAgenda, useClientes, useConfig, type Atendimento, type Status,
+} from "@/lib/data";
+import { itensParaForm, nomesItens, validarItens, type ItemForm } from "@/lib/itens";
 import {
   FORMAS, brl, diaDoMes, diaPorExtenso, diaSemanaCurto, hojeISO, horaDeMinutos, horaHM,
-  inicioSemana, mesAno, minutos, parseValor, somarDias, type Forma,
+  inicioSemana, mesAno, minutos, somarDias, type Forma,
 } from "@/lib/format";
 import { gradeMes } from "@/lib/agenda";
 import { linkGoogleAgenda, linkWhatsapp } from "@/lib/links";
@@ -116,7 +119,7 @@ function Page() {
     const url = linkWhatsapp({
       telefone: cliente?.telefone,
       cliente: a.clientes?.nome ?? cliente?.nome ?? "",
-      servico: a.servicos?.nome ?? "Serviço",
+      servico: nomesItens(a.itens),
       data: a.data,
       hora: a.hora,
     });
@@ -127,7 +130,7 @@ function Page() {
   function adicionarGoogleAgenda(a: Atendimento) {
     // Só observações do agendamento; nada da anamnese vai para o Google.
     const url = linkGoogleAgenda({
-      servico: a.servicos?.nome ?? "Serviço",
+      servico: nomesItens(a.itens),
       cliente: a.clientes?.nome ?? "—",
       data: a.data,
       hora: a.hora,
@@ -307,7 +310,7 @@ function Page() {
                         {a.clientes?.nome ?? "—"}
                       </div>
                       <div className="truncate text-sm text-muted-foreground">
-                        {a.servicos?.nome ?? "Serviço"} · {brl(a.valor_bruto)}
+                        {nomesItens(a.itens)} · {brl(a.valor_bruto)}
                       </div>
                     </button>
                   </li>
@@ -325,7 +328,7 @@ function Page() {
               <DrawerHeader className="text-left">
                 <DrawerTitle className="font-display text-2xl">{acoes.clientes?.nome ?? "—"}</DrawerTitle>
                 <DrawerDescription>
-                  {diaPorExtenso(acoes.data)} · {intervalo(acoes)} · {acoes.servicos?.nome ?? "Serviço"} · {brl(acoes.valor_bruto)}
+                  {diaPorExtenso(acoes.data)} · {intervalo(acoes)} · {nomesItens(acoes.itens)} · {brl(acoes.valor_bruto)}
                 </DrawerDescription>
               </DrawerHeader>
               <div className="space-y-3 overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
@@ -369,33 +372,41 @@ function Page() {
 
 function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | null; onClose: () => void }) {
   const qc = useQueryClient();
-  const [valor, setValor] = useState("");
+  const [itens, setItens] = useState<ItemForm[]>([]);
   const [forma, setForma] = useState<Forma | "">("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!atendimento) return;
-    setValor(String(atendimento.valor_bruto));
+    setItens(itensParaForm(atendimento.itens));
     setForma("");
   }, [atendimento]);
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     if (!atendimento) return;
-    const v = parseValor(valor);
-    if (!Number.isFinite(v) || v < 0) return void toast.error("Valor inválido.");
+    const v = validarItens(itens);
+    if ("erro" in v) return void toast.error(v.erro);
     if (!forma) return void toast.error("Escolha a forma de pagamento.");
     setSaving(true);
-    const patch: TablesUpdate<"atendimentos"> & { status: Status } = {
-      status: "realizado", valor_bruto: v, forma_pagamento: forma,
-    };
-    const { error } = await supabase.from("atendimentos").update(patch).eq("id", atendimento.id);
-    setSaving(false);
-    if (error) return void toast.error("Não foi possível concluir.");
-    // Atualiza Atendimentos, ficha da cliente, Acerto e a própria agenda.
-    qc.invalidateQueries({ queryKey: ["atendimentos"] });
-    toast.success("Atendimento concluído");
-    onClose();
+    try {
+      // O total vem da soma dos itens (calculada no banco).
+      const { atendimento: lido, duracaoAjustada } = await salvarAtendimentoComItens(
+        atendimento.id,
+        { status: "realizado", forma_pagamento: forma },
+        v.itens,
+      );
+      toast.success(`Atendimento concluído · ${brl(lido.valor_bruto)}`);
+      if (duracaoAjustada) toast.warning(`A duração total foi limitada a ${lido.duracao_min} min.`);
+      onClose();
+    } catch (err) {
+      console.error(err);
+      toast.error("Não foi possível concluir.");
+    } finally {
+      setSaving(false);
+      // Atualiza Atendimentos, ficha da cliente, Acerto e a própria agenda.
+      qc.invalidateQueries({ queryKey: ["atendimentos"] });
+    }
   }
 
   return (
@@ -403,15 +414,12 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
       <DrawerContent className="max-h-[92vh]">
         <DrawerHeader className="text-left">
           <DrawerTitle className="font-display text-2xl">Concluir atendimento</DrawerTitle>
-          <DrawerDescription>
-            {atendimento?.clientes?.nome ?? "—"} · {atendimento?.servicos?.nome ?? "Serviço"}
+          <DrawerDescription className="truncate">
+            {atendimento?.clientes?.nome ?? "—"} · {atendimento ? nomesItens(atendimento.itens) : ""}
           </DrawerDescription>
         </DrawerHeader>
         <form onSubmit={salvar} className="space-y-4 overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
-          <div className="space-y-2">
-            <Label>Valor (R$)</Label>
-            <Input className="h-12 text-base" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} />
-          </div>
+          <ServicosPicker itens={itens} onChange={setItens} />
           <div className="space-y-2">
             <Label>Forma de pagamento</Label>
             <div className="grid grid-cols-2 gap-2">

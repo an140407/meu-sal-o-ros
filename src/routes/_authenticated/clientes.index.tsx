@@ -14,6 +14,7 @@ import { useAtendimentos, useClientes, useClientesComAgendamento, type Cliente }
 import { clientesParaRetorno, ehAniversarioNoMes } from "@/lib/clientes";
 import { dataBR, hojeISO, mesAno } from "@/lib/format";
 import { linkWhatsappTexto, mensagemAniversario, mensagemRetorno } from "@/lib/links";
+import { nomesItens } from "@/lib/itens";
 import { cn } from "@/lib/utils";
 
 const ABAS = ["todas", "retorno", "aniversario"] as const;
@@ -137,7 +138,7 @@ function ParaRetorno({ clientes }: { clientes: Cliente[] }) {
   const { data: comAgendamento } = useClientesComAgendamento(hoje);
   const lista = clientesParaRetorno(
     clientes,
-    realizados.map((a) => ({ cliente_id: a.cliente_id, data: a.data, servico: a.servicos?.nome ?? null })),
+    realizados.map((a) => ({ cliente_id: a.cliente_id, data: a.data, servico: nomesItens(a.itens) })),
     comAgendamento ?? new Set<string>(),
     hoje,
     prazo,
@@ -170,7 +171,7 @@ function ParaRetorno({ clientes }: { clientes: Cliente[] }) {
             <li key={c.id} className="space-y-3 px-4 py-4">
               <Link to="/clientes/$id" params={{ id: c.id }} className="block">
                 <div className="font-semibold">{c.nome}</div>
-                <div className="text-sm text-muted-foreground">
+                <div className="truncate text-sm text-muted-foreground">
                   há {dias} dias{ultimoServico ? ` · ${ultimoServico}` : ""}
                 </div>
               </Link>

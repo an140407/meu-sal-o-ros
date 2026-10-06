@@ -15,17 +15,20 @@ describe("mesesPeriodo", () => {
   });
 });
 
-const at = (p: Partial<AtendimentoEstat> & { data: string }): AtendimentoEstat => ({
-  status: "realizado",
-  valor_bruto: 100,
-  valor_liquido: 100,
-  percentual_ana: 70,
-  cliente_id: "c1",
-  servico_id: "s1",
-  clientes: { nome: "Ana" },
-  servicos: { nome: "Gel" },
-  ...p,
-});
+const at = (p: Partial<AtendimentoEstat> & { data: string }): AtendimentoEstat => {
+  const valor_bruto = p.valor_bruto ?? 100;
+  return {
+    status: "realizado",
+    valor_liquido: 100,
+    percentual_ana: 70,
+    cliente_id: "c1",
+    clientes: { nome: "Ana" },
+    itens: [{ servico_id: "s1", nome: "Gel", valor: Number(valor_bruto), duracao_min: 60 }],
+    ...p,
+    valor_bruto,
+  };
+};
+const item = (servico_id: string | null, nome: string, valor: number) => ({ servico_id, nome, valor, duracao_min: 30 });
 
 describe("estatisticas", () => {
   const meses = ["2026-09", "2026-10"];
@@ -57,9 +60,15 @@ describe("estatisticas", () => {
   it("ranqueia serviços e clientes por quantidade, depois valor, limitado a 5", () => {
     const lista = [
       ...["s1", "s1", "s2", "s2", "s2", "s3", "s4", "s5", "s6", "s7"].map((s, i) =>
-        at({ data: "2026-10-01", servico_id: s, servicos: { nome: s.toUpperCase() }, valor_bruto: i * 10, cliente_id: `c${i % 3}`, clientes: { nome: `C${i % 3}` } }),
+        at({
+          data: "2026-10-01",
+          valor_bruto: i * 10,
+          itens: [item(s, s.toUpperCase(), i * 10)],
+          cliente_id: `c${i % 3}`,
+          clientes: { nome: `C${i % 3}` },
+        }),
       ),
-      at({ data: "2026-10-01", servico_id: null, servicos: null, status: "faltou" }),
+      at({ data: "2026-10-01", itens: [item(null, "Avulso", 100)], status: "faltou" }),
     ];
     const e = estatisticas(lista, meses, hoje);
     expect(e.topServicos.map((s) => [s.nome, s.qtd, s.valor])).toEqual([
@@ -70,6 +79,25 @@ describe("estatisticas", () => {
       ["S5", 1, 70],
     ]);
     expect(e.topClientes.map((c) => [c.nome, c.qtd])).toEqual([["C0", 4], ["C2", 3], ["C1", 3]]);
+  });
+
+  it("serviços mais feitos contam por item; faturamento pelo total do atendimento", () => {
+    const e = estatisticas(
+      [
+        at({ data: "2026-10-01", valor_bruto: 150, itens: [item("fibra", "Fibra", 100), item("gel", "Gel", 50)] }),
+        at({ data: "2026-10-02", valor_bruto: 60, itens: [item("gel", "Gel", 60)] }),
+        at({ data: "2026-10-03", status: "agendado", valor_bruto: 999, itens: [item("gel", "Gel", 999)] }),
+      ],
+      meses,
+      hoje,
+    );
+    expect(e.bruto).toBe(210);
+    expect(e.realizados).toBe(2);
+    expect(e.ticketMedio).toBe(105);
+    expect(e.topServicos.map((s) => [s.nome, s.qtd, s.valor])).toEqual([
+      ["Gel", 2, 110],
+      ["Fibra", 1, 100],
+    ]);
   });
 
   it("taxa de faltas e cancelamentos só com registros até hoje", () => {

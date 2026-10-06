@@ -14,8 +14,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "./ui-bits";
 import { ClienteForm, emptyCliente } from "./ClienteForm";
-import { useClientes, useServicos, type Atendimento } from "@/lib/data";
-import { FORMAS, hojeISO, horaAgora, horaHM, parseValor, type Forma } from "@/lib/format";
+import { ServicosPicker } from "./ServicosPicker";
+import { salvarAtendimentoComItens, useClientes, type Atendimento } from "@/lib/data";
+import { FORMAS, brl, hojeISO, horaAgora, horaHM, type Forma } from "@/lib/format";
+import { itensParaForm, validarItens, type ItemForm } from "@/lib/itens";
 
 export function AtendimentoForm({
   open, onOpenChange, editing, clienteFixo,
@@ -27,12 +29,8 @@ export function AtendimentoForm({
 }) {
   const qc = useQueryClient();
   const { data: clientes = [] } = useClientes();
-  const { data: servicos = [] } = useServicos();
   const [clienteId, setClienteId] = useState("");
-  const [servicoId, setServicoId] = useState("");
-  const [valor, setValor] = useState("");
-  // Sem campo próprio: vem do serviço escolhido e vai no insert (a Agenda usa para ocupar o horário).
-  const [duracao, setDuracao] = useState(60);
+  const [itens, setItens] = useState<ItemForm[]>([]);
   const [data, setData] = useState(hojeISO());
   const [hora, setHora] = useState("");
   const [forma, setForma] = useState<Forma>("pix");
@@ -46,21 +44,17 @@ export function AtendimentoForm({
     setNovoCliente(false);
     if (editing) {
       setClienteId(editing.cliente_id);
-      setServicoId(editing.servico_id ?? "");
-      setValor(String(editing.valor_bruto));
+      setItens(itensParaForm(editing.itens));
       setData(editing.data);
       setHora(horaHM(editing.hora));
       setForma(editing.forma_pagamento as Forma);
-      setDuracao(editing.duracao_min);
       setObs(editing.observacoes ?? "");
     } else {
       setClienteId(clienteFixo ?? "");
-      setServicoId("");
-      setValor("");
+      setItens([]);
       setData(hojeISO());
       setHora(horaAgora());
       setForma("pix");
-      setDuracao(60);
       setObs("");
     }
   }, [open, editing, clienteFixo]);
@@ -71,23 +65,27 @@ export function AtendimentoForm({
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
-    const v = parseValor(valor);
     if (!clienteId) return void toast.error("Escolha a cliente.");
-    if (!servicoId) return void toast.error("Escolha o serviço.");
-    if (!Number.isFinite(v) || v < 0) return void toast.error("Valor inválido.");
+    const v = validarItens(itens);
+    if ("erro" in v) return void toast.error(v.erro);
     setSaving(true);
-    const payload = {
-      cliente_id: clienteId, servico_id: servicoId, valor_bruto: v, data, hora: hora || null,
-      forma_pagamento: forma, observacoes: obs.trim() || null,
-    };
-    const { error } = editing
-      ? await supabase.from("atendimentos").update(payload).eq("id", editing.id)
-      : await supabase.from("atendimentos").insert({ ...payload, status: "realizado", duracao_min: duracao });
-    setSaving(false);
-    if (error) return void toast.error("Não foi possível salvar.");
-    toast.success(editing ? "Atendimento atualizado" : "Atendimento registrado");
-    refresh();
-    onOpenChange(false);
+    const campos = { cliente_id: clienteId, data, hora: hora || null, forma_pagamento: forma, observacoes: obs.trim() || null };
+    try {
+      const { atendimento, duracaoAjustada } = await salvarAtendimentoComItens(
+        editing?.id ?? null,
+        editing ? campos : { ...campos, status: "realizado" },
+        v.itens,
+      );
+      toast.success(`${editing ? "Atendimento atualizado" : "Atendimento registrado"} · ${brl(atendimento.valor_bruto)}`);
+      if (duracaoAjustada) toast.warning(`A duração total foi limitada a ${atendimento.duracao_min} min.`);
+      onOpenChange(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Não foi possível salvar.");
+    } finally {
+      setSaving(false);
+      refresh();
+    }
   }
 
   async function excluir() {
@@ -99,8 +97,6 @@ export function AtendimentoForm({
     setConfirmDel(false);
     onOpenChange(false);
   }
-
-  const ativos = servicos.filter((s) => s.ativo || s.id === servicoId);
 
   return (
     <>
@@ -145,27 +141,7 @@ export function AtendimentoForm({
                     )}
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Serviço</Label>
-                  <NativeSelect
-                    value={servicoId}
-                    onChange={(e) => {
-                      setServicoId(e.target.value);
-                      const s = servicos.find((x) => x.id === e.target.value);
-                      if (s) {
-                        setValor(String(s.preco_padrao));
-                        setDuracao(s.duracao_min);
-                      }
-                    }}
-                  >
-                    <option value="">Selecione...</option>
-                    {ativos.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                  </NativeSelect>
-                </div>
-                <div className="space-y-2">
-                  <Label>Valor (R$)</Label>
-                  <Input className="h-12 text-base" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} />
-                </div>
+                <ServicosPicker itens={itens} onChange={setItens} />
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>Data</Label>

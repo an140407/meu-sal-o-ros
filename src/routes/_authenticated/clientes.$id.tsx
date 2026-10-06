@@ -17,6 +17,7 @@ import { AtendimentoForm } from "@/components/app/AtendimentoForm";
 import { useAtendimentos, useClientes, useProximosDaCliente, type Atendimento } from "@/lib/data";
 import { brl, dataBR, diaPorExtenso, hojeISO, horaDeMinutos, horaHM, minutos } from "@/lib/format";
 import { linkWhatsappTexto, normalizarTelefone } from "@/lib/links";
+import { nomesItens } from "@/lib/itens";
 
 export const Route = createFileRoute("/_authenticated/clientes/$id")({
   head: () => ({
@@ -120,7 +121,7 @@ function Page() {
                         <div className="font-semibold">{diaPorExtenso(a.data)}</div>
                         <div className="truncate text-sm text-muted-foreground">
                           {a.hora ? `${horaHM(a.hora)}–${horaDeMinutos(minutos(a.hora) + a.duracao_min)} · ` : ""}
-                          {a.servicos?.nome ?? "Serviço"}
+                          {nomesItens(a.itens)}
                         </div>
                       </div>
                       <div className="shrink-0 font-semibold">{brl(a.valor_bruto)}</div>

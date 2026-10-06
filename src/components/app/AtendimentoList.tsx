@@ -1,5 +1,6 @@
 import { brl, dataHora, formaLabel, mesAno } from "@/lib/format";
 import type { Atendimento } from "@/lib/data";
+import { nomesItens } from "@/lib/itens";
 
 export function AtendimentoList({
   itens, onSelect, mostrarCliente = true, nomeDona,
@@ -41,10 +42,10 @@ export function AtendimentoList({
                   <button onClick={() => onSelect(a)} className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left active:bg-muted">
                     <div className="min-w-0">
                       <div className="truncate font-semibold">
-                        {mostrarCliente ? a.clientes?.nome ?? "—" : a.servicos?.nome ?? "Serviço"}
+                        {mostrarCliente ? a.clientes?.nome ?? "—" : nomesItens(a.itens)}
                       </div>
                       <div className="truncate text-sm text-muted-foreground">
-                        {dataHora(a.data, a.hora)} · {mostrarCliente ? `${a.servicos?.nome ?? "Serviço"} · ` : ""}{formaLabel(a.forma_pagamento)}
+                        {dataHora(a.data, a.hora)} · {mostrarCliente ? `${nomesItens(a.itens)} · ` : ""}{formaLabel(a.forma_pagamento)}
                       </div>
                     </div>
                     <div className="shrink-0 text-right">

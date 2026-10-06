@@ -3,7 +3,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertTriangle, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -15,8 +14,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "./ui-bits";
 import { ClienteForm, emptyCliente } from "./ClienteForm";
-import { STATUS_ATIVOS, useAgenda, useClientes, useConfig, useServicos, type Atendimento, type Cliente, type Status } from "@/lib/data";
-import { hojeISO, horaAgora, horaHM, minutos, parseValor } from "@/lib/format";
+import { ServicosPicker } from "./ServicosPicker";
+import {
+  STATUS_ATIVOS, salvarAtendimentoComItens, useAgenda, useClientes, useConfig, type Atendimento, type Cliente,
+} from "@/lib/data";
+import { brl, hojeISO, horaAgora, horaHM, minutos } from "@/lib/format";
+import { itensParaForm, limitarDuracao, totaisForm, validarItens, type ItemForm } from "@/lib/itens";
 import { horariosLivres } from "@/lib/agenda";
 import { cn } from "@/lib/utils";
 
@@ -52,13 +55,10 @@ export function AgendaForm({
 }) {
   const qc = useQueryClient();
   const { data: clientes = [] } = useClientes();
-  const { data: servicos = [] } = useServicos();
   const [clienteId, setClienteId] = useState("");
-  const [servicoId, setServicoId] = useState("");
-  const [valor, setValor] = useState("");
+  const [itens, setItens] = useState<ItemForm[]>([]);
   const [data, setData] = useState(dia);
   const [hora, setHora] = useState("");
-  const [duracao, setDuracao] = useState("60");
   const [obs, setObs] = useState("");
   const [novoCliente, setNovoCliente] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -69,25 +69,22 @@ export function AgendaForm({
     setNovoCliente(false);
     if (editing) {
       setClienteId(editing.cliente_id);
-      setServicoId(editing.servico_id ?? "");
-      setValor(String(editing.valor_bruto));
+      setItens(itensParaForm(editing.itens));
       setData(editing.data);
       setHora(horaHM(editing.hora));
-      setDuracao(String(editing.duracao_min));
       setObs(editing.observacoes ?? "");
     } else {
       setClienteId(clienteInicial ?? "");
-      setServicoId("");
-      setValor("");
+      setItens([]);
       setData(dia);
       setHora(horaSugerida);
-      setDuracao("60");
       setObs("");
     }
   }, [open, editing, dia, horaSugerida, clienteInicial]);
 
-  const v = parseValor(valor);
-  const dur = Number(duracao);
+  // Duração total do atendimento (soma dos itens, limitada a 15–480) para horários e conflitos.
+  const totalDuracao = totaisForm(itens).duracao;
+  const dur = totalDuracao > 0 ? limitarDuracao(totalDuracao).duracao : Number.NaN;
 
   const { data: cfg } = useConfig();
   const { data: doDiaForm, isLoading: carregandoDia } = useAgenda(data || dia, data || dia);
@@ -106,10 +103,9 @@ export function AgendaForm({
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     if (!clienteId) return void toast.error("Escolha a cliente.");
-    if (!servicoId) return void toast.error("Escolha o serviço.");
-    if (!Number.isFinite(v) || v < 0) return void toast.error("Valor inválido.");
+    const v = validarItens(itens);
+    if ("erro" in v) return void toast.error(v.erro);
     if (!data || !hora) return void toast.error("Informe data e hora.");
-    if (!Number.isInteger(dur) || dur < 15 || dur > 480) return void toast.error("Use uma duração entre 15 e 480 minutos.");
 
     setSaving(true);
     const { data: doDia, error } = await supabase
@@ -133,27 +129,29 @@ export function AgendaForm({
   }
 
   async function gravar() {
+    const v = validarItens(itens);
+    if ("erro" in v) return void toast.error(v.erro);
     setSaving(true);
-    const payload: TablesUpdate<"atendimentos"> & { duracao_min: number } = {
-      cliente_id: clienteId, servico_id: servicoId, valor_bruto: v, data, hora,
-      duracao_min: dur, observacoes: obs.trim() || null,
-    };
-    // forma_pagamento é obrigatória; a forma real é escolhida ao concluir.
-    const novo: TablesInsert<"atendimentos"> & { duracao_min: number; status: Status } = {
-      ...payload, cliente_id: clienteId, forma_pagamento: "pix", status: "agendado",
-    };
-    const { error } = editing
-      ? await supabase.from("atendimentos").update(payload).eq("id", editing.id)
-      : await supabase.from("atendimentos").insert(novo);
-    setSaving(false);
-    if (error) return void toast.error("Não foi possível salvar.");
-    toast.success(editing ? "Agendamento atualizado" : "Agendado");
-    qc.invalidateQueries({ queryKey: ["atendimentos"] });
-    setConfirmSobreposicao(false);
-    onOpenChange(false);
+    const campos = { cliente_id: clienteId, data, hora, observacoes: obs.trim() || null };
+    try {
+      const { atendimento, duracaoAjustada } = await salvarAtendimentoComItens(
+        editing?.id ?? null,
+        // forma_pagamento é obrigatória; a forma real é escolhida ao concluir.
+        editing ? campos : { ...campos, forma_pagamento: "pix", status: "agendado" },
+        v.itens,
+      );
+      toast.success(`${editing ? "Agendamento atualizado" : "Agendado"} · ${brl(atendimento.valor_bruto)}`);
+      if (duracaoAjustada) toast.warning(`A duração total foi limitada a ${atendimento.duracao_min} min.`);
+      setConfirmSobreposicao(false);
+      onOpenChange(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Não foi possível salvar.");
+    } finally {
+      setSaving(false);
+      qc.invalidateQueries({ queryKey: ["atendimentos"] });
+    }
   }
-
-  const ativos = servicos.filter((s) => s.ativo || s.id === servicoId);
 
   return (
     <>
@@ -197,33 +195,7 @@ export function AgendaForm({
                   </div>
                 </div>
                 <AvisoSaude cliente={clientes.find((c) => c.id === clienteId)} />
-                <div className="space-y-2">
-                  <Label>Serviço</Label>
-                  <NativeSelect
-                    value={servicoId}
-                    onChange={(e) => {
-                      setServicoId(e.target.value);
-                      const s = servicos.find((x) => x.id === e.target.value);
-                      if (s) {
-                        setValor(String(s.preco_padrao));
-                        setDuracao(String(s.duracao_min));
-                      }
-                    }}
-                  >
-                    <option value="">Selecione...</option>
-                    {ativos.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                  </NativeSelect>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Valor (R$)</Label>
-                    <Input className="h-12 text-base" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Duração (min)</Label>
-                    <Input className="h-12 text-base" inputMode="numeric" value={duracao} onChange={(e) => setDuracao(e.target.value)} />
-                  </div>
-                </div>
+                <ServicosPicker itens={itens} onChange={setItens} />
                 <div className="space-y-2">
                   <Label>Data</Label>
                   <Input className="h-12 text-base" type="date" required value={data} onChange={(e) => setData(e.target.value)} />

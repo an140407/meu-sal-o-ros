@@ -1,3 +1,5 @@
+import { agregarPorServico, type ItemServico } from "./itens";
+
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Os `n` meses que terminam em `mesAtual` ("YYYY-MM"), do mais antigo ao mais recente. */
@@ -20,9 +22,9 @@ export type AtendimentoEstat = {
   valor_liquido: number | string;
   percentual_ana: number | string;
   cliente_id: string;
-  servico_id: string | null;
   clientes: { nome: string } | null;
-  servicos: { nome: string } | null;
+  /** Serviços do atendimento (ver itensDoAtendimento). */
+  itens: ItemServico[];
 };
 
 export type Ranking = { id: string; nome: string; qtd: number; valor: number };
@@ -35,6 +37,8 @@ const top5 = (m: Map<string, Ranking>) =>
 
 /**
  * Estatísticas dos `meses` informados. Dinheiro, contagens e rankings usam só 'realizado';
+ * faturamento e parte da Ana vêm dos totais dos atendimentos; "serviços mais feitos" conta
+ * por item (qtd = itens daquele serviço, valor = soma dos valores desses itens);
  * a taxa de faltas/cancelamentos é (faltou + cancelado) ÷ registros do período com data até
  * `hoje` (agendamentos futuros ainda não tiveram chance de faltar).
  */
@@ -52,13 +56,9 @@ export function estatisticas(atendimentos: AtendimentoEstat[], meses: string[], 
     };
   });
 
-  const servicos = new Map<string, Ranking>();
   const clientes = new Map<string, Ranking>();
   for (const a of realizados) {
     const v = Number(a.valor_bruto);
-    const sid = a.servico_id ?? "sem-servico";
-    const s = servicos.get(sid) ?? { id: sid, nome: a.servicos?.nome ?? "Sem serviço", qtd: 0, valor: 0 };
-    servicos.set(sid, { ...s, qtd: s.qtd + 1, valor: s.valor + v });
     const c = clientes.get(a.cliente_id) ?? { id: a.cliente_id, nome: a.clientes?.nome ?? "—", qtd: 0, valor: 0 };
     clientes.set(a.cliente_id, { ...c, qtd: c.qtd + 1, valor: c.valor + v });
   }
@@ -74,7 +74,7 @@ export function estatisticas(atendimentos: AtendimentoEstat[], meses: string[], 
     bruto,
     ana: r2(porMes.reduce((s, m) => s + m.ana, 0)),
     ticketMedio: realizados.length ? r2(bruto / realizados.length) : 0,
-    topServicos: top5(servicos),
+    topServicos: agregarPorServico(realizados.flatMap((a) => a.itens)),
     topClientes: top5(clientes),
     faltas,
     cancelados,
