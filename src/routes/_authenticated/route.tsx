@@ -32,7 +32,7 @@ function Layout() {
   return (
     <div className="mx-auto min-h-screen max-w-lg pb-28">
       <Outlet />
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
+      <nav aria-label="Navegação principal" className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto grid max-w-lg grid-cols-5">
           {tabs.map((t) => (
             <Link
@@ -40,11 +40,18 @@ function Layout() {
               to={t.to}
               aria-current={ativa(t) ? "page" : undefined}
               className={cn(
-                "flex flex-col items-center gap-1 py-3 text-xs font-medium",
-                ativa(t) ? "text-primary" : "text-muted-foreground",
+                "flex min-h-16 flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                ativa(t) ? "font-semibold text-primary" : "text-muted-foreground",
               )}
             >
-              <t.icon className="size-6" />
+              <span
+                className={cn(
+                  "flex h-8 w-14 items-center justify-center rounded-full transition-colors duration-150",
+                  ativa(t) && "bg-secondary",
+                )}
+              >
+                <t.icon className="size-6" aria-hidden />
+              </span>
               {t.label}
             </Link>
           ))}

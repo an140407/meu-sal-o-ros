@@ -32,7 +32,7 @@ import { itensParaForm, nomesItens, somaItens, totaisForm, validarItens, type It
 import { formaPrincipal, partesIniciais, validarPagamentos, type ParteForm } from "@/lib/pagamentos";
 import { mensagemErro } from "@/lib/erros";
 import {
-  brl, dataBR, diaDoMes, diaPorExtenso, diaSemanaCurto, hojeISO, horaDeMinutos, horaHM,
+  brl, dataBR, diaDoMes, diaPorExtenso, diaSemanaCurto, hojeISO, horaAgora, horaDeMinutos, horaHM,
   inicioSemana, mesAno, minutos, somarDias,
 } from "@/lib/format";
 import { gradeMes } from "@/lib/agenda";
@@ -123,10 +123,13 @@ function Page() {
 
   const inicioExp = horaHM(cfg?.hora_inicio) || "08:00";
   const fimExp = horaHM(cfg?.hora_fim) || "19:00";
-  // Sugere o fim do último agendamento ativo do dia, se ainda couber no expediente.
+  // Sugere o fim do último agendamento ativo do dia (hoje: nunca antes de agora, arredondado a 15 min),
+  // se ainda couber no expediente.
+  const agoraArredondado = dia === hoje ? Math.ceil(minutos(horaAgora()) / 15) * 15 : 0;
   const ultimoFim = Math.max(
     ...doDia.filter((a) => ativo(a) && a.hora).map((a) => minutos(a.hora!) + a.duracao_min),
     minutos(inicioExp),
+    agoraArredondado,
   );
   const horaSugerida = ultimoFim < minutos(fimExp) ? horaDeMinutos(ultimoFim) : inicioExp;
 
@@ -210,11 +213,11 @@ function Page() {
       {visao === "mes" ? (
         <div className="px-2">
           <div className="flex items-center justify-between gap-2">
-            <Button variant="ghost" className="h-12 w-10 shrink-0 px-0" aria-label="Mês anterior" onClick={() => setDia(`${somarDias(`${mes}-01`, -1).slice(0, 7)}-01`)}>
+            <Button variant="ghost" className="size-11 shrink-0 px-0" aria-label="Mês anterior" onClick={() => setDia(`${somarDias(`${mes}-01`, -1).slice(0, 7)}-01`)}>
               <ChevronLeft className="size-6" />
             </Button>
             <h2 className="text-xl">{mesAno(mes)}</h2>
-            <Button variant="ghost" className="h-12 w-10 shrink-0 px-0" aria-label="Próximo mês" onClick={() => setDia(proximoMes(mes))}>
+            <Button variant="ghost" className="size-11 shrink-0 px-0" aria-label="Próximo mês" onClick={() => setDia(proximoMes(mes))}>
               <ChevronRight className="size-6" />
             </Button>
           </div>
@@ -230,9 +233,9 @@ function Page() {
                   key={d}
                   type="button"
                   onClick={() => { setDia(d); setVisao("dia"); }}
-                  aria-label={`${diaPorExtenso(d)}${d === hoje ? " (hoje)" : ""}, ${n} agendamento(s)`}
+                  aria-label={`${diaPorExtenso(d)}${d === hoje ? " (hoje)" : ""}, ${plural(n, "agendamento", "agendamentos")}`}
                   className={cn(
-                    "flex h-16 flex-col items-center justify-start gap-1 rounded-xl pt-1.5 active:bg-muted",
+                    "flex h-16 flex-col items-center justify-start gap-1 rounded-xl pt-1.5 active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     foraDoMes && "text-muted-foreground/60",
                     d === hoje && "bg-secondary font-semibold text-primary ring-1 ring-primary",
                   )}
@@ -257,7 +260,7 @@ function Page() {
       ) : (
         <>
           <div className="flex items-center gap-1 px-2">
-            <Button variant="ghost" className="h-16 w-10 shrink-0 px-0" aria-label="Semana anterior" onClick={() => setDia(somarDias(dia, -7))}>
+            <Button variant="ghost" className="h-16 w-11 shrink-0 px-0" aria-label="Semana anterior" onClick={() => setDia(somarDias(dia, -7))}>
               <ChevronLeft className="size-6" />
             </Button>
             <div className="grid flex-1 grid-cols-7 gap-1">
@@ -271,7 +274,7 @@ function Page() {
                     aria-pressed={sel}
                     aria-label={`${diaPorExtenso(d)}${d === hoje ? " (hoje)" : ""}${comAgenda.has(d) ? ", com agendamentos" : ""}`}
                     className={cn(
-                      "flex h-16 flex-col items-center justify-center rounded-xl",
+                      "flex h-16 flex-col items-center justify-center rounded-xl transition-transform duration-150 ease-out active:scale-[0.96] motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       sel ? "bg-primary text-primary-foreground shadow-soft" : "active:bg-muted",
                       d === hoje && !sel && "bg-secondary font-semibold text-primary ring-1 ring-primary",
                     )}
@@ -279,6 +282,7 @@ function Page() {
                     <span className="text-[11px] uppercase tracking-wide">{diaSemanaCurto(d)}</span>
                     <span className="text-lg font-semibold leading-tight">{diaDoMes(d)}</span>
                     <span
+                      aria-hidden
                       className={cn(
                         "mt-0.5 size-1.5 rounded-full",
                         comAgenda.has(d) ? (sel ? "bg-primary-foreground" : "bg-primary") : "bg-transparent",
@@ -288,7 +292,7 @@ function Page() {
                 );
               })}
             </div>
-            <Button variant="ghost" className="h-16 w-10 shrink-0 px-0" aria-label="Próxima semana" onClick={() => setDia(somarDias(dia, 7))}>
+            <Button variant="ghost" className="h-16 w-11 shrink-0 px-0" aria-label="Próxima semana" onClick={() => setDia(somarDias(dia, 7))}>
               <ChevronRight className="size-6" />
             </Button>
           </div>
@@ -304,7 +308,7 @@ function Page() {
 
             {isLoading ? <Empty>Carregando...</Empty> : doDia.length === 0 ? (
               <div className="flex flex-col items-center gap-2 rounded-2xl bg-rose-gradient px-5 py-10 text-center">
-                <CalendarDays className="size-8 text-primary" />
+                <CalendarDays className="size-8 text-primary" aria-hidden />
                 <p className="font-semibold">Dia livre por enquanto</p>
                 <p className="text-sm text-muted-foreground">Toque em “Agendar” para marcar uma cliente.</p>
               </div>
@@ -316,24 +320,25 @@ function Page() {
                       type="button"
                       onClick={() => setAcoes(a)}
                       className={cn(
-                        "w-full rounded-2xl border border-l-4 bg-card px-4 py-3 text-left active:bg-muted",
+                        "w-full rounded-2xl border border-l-4 bg-card px-4 py-3 text-left transition-transform duration-150 ease-out active:scale-[0.98] active:bg-muted motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                         STATUS[a.status].borda,
                         !ativo(a) && "opacity-50",
                       )}
                     >
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
                         <span className="font-semibold tabular-nums">{intervalo(a)}</span>
                         <SeloSerie a={a} membros={membrosDe(a)} />
-                        <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", STATUS[a.status].badge)}>
+                        <span className={cn("ml-auto shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold", STATUS[a.status].badge)}>
                           {STATUS[a.status].label}
                         </span>
                       </div>
-                      <div className={cn("mt-1 truncate text-lg font-semibold", !ativo(a) && "line-through")}>
-                        {a.clientes?.nome ?? "—"}
+                      <div className="mt-1 flex items-baseline justify-between gap-3">
+                        <span className={cn("min-w-0 truncate text-lg font-semibold", !ativo(a) && "line-through")}>
+                          {a.clientes?.nome ?? "—"}
+                        </span>
+                        <span className="shrink-0 font-semibold tabular-nums">{brl(a.valor_bruto)}</span>
                       </div>
-                      <div className="truncate text-sm text-muted-foreground">
-                        {nomesItens(a.itens)} · {brl(a.valor_bruto)}
-                      </div>
+                      <div className="line-clamp-2 text-sm text-muted-foreground">{nomesItens(a.itens)}</div>
                     </button>
                   </li>
                 ))}
@@ -446,7 +451,7 @@ function SeloSerie({ a, membros }: { a: Atendimento; membros: Membro[] }) {
   const pos = a.serie_id ? posicaoNaSerie(a.id, membros) : null;
   if (!pos) return null;
   return (
-    <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-primary tabular-nums">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-primary tabular-nums">
       <Repeat className="size-3.5" aria-hidden />
       <span className="sr-only">Série, </span>{pos.n} de {pos.m}
     </span>

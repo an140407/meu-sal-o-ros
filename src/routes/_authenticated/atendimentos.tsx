@@ -10,9 +10,9 @@ import { useAtendimentos, useConfig, type Atendimento } from "@/lib/data";
 export const Route = createFileRoute("/_authenticated/atendimentos")({
   head: () => ({
     meta: [
-      { title: "Atendimentos — Lunula" },
+      { title: "Histórico — Lunula" },
       { name: "description", content: "Atendimentos registrados por mês." },
-      { property: "og:title", content: "Atendimentos — Lunula" },
+      { property: "og:title", content: "Histórico — Lunula" },
       { property: "og:description", content: "Atendimentos registrados por mês." },
     ],
   }),
@@ -27,7 +27,7 @@ function Page() {
 
   return (
     <>
-      <PageHeader title="Atendimentos" />
+      <PageHeader title="Histórico" />
       <div className="px-5 pb-5">
         <Button size="xl" onClick={() => { setEditing(null); setOpen(true); }}>
           <Plus /> Novo atendimento

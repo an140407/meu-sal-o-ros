@@ -13,7 +13,7 @@ import { ClienteForm, emptyCliente } from "@/components/app/ClienteForm";
 import { useAtendimentos, useClientes, useClientesComAgendamento, type Cliente } from "@/lib/data";
 import { clientesParaRetorno, ehAniversarioNoMes } from "@/lib/clientes";
 import { dataBR, hojeISO, mesAno } from "@/lib/format";
-import { linkWhatsappTexto, mensagemAniversario, mensagemRetorno } from "@/lib/links";
+import { formatarTelefone, linkWhatsappTexto, mensagemAniversario, mensagemRetorno } from "@/lib/links";
 import { nomesItens } from "@/lib/itens";
 import { plural } from "@/lib/texto";
 import { cn } from "@/lib/utils";
@@ -58,10 +58,10 @@ function Page() {
         onValueChange={(v) => navigate({ to: "/clientes", search: { aba: v as Aba }, replace: true })}
       >
         <div className="px-5 pb-4">
-          <TabsList className="grid h-12 w-full grid-cols-3 rounded-2xl">
-            <TabsTrigger value="todas" className="h-10 rounded-xl px-1 text-sm">Todas</TabsTrigger>
-            <TabsTrigger value="retorno" className="h-10 rounded-xl px-1 text-sm">Para retorno</TabsTrigger>
-            <TabsTrigger value="aniversario" className="h-10 rounded-xl px-1 text-sm">Aniversariantes</TabsTrigger>
+          <TabsList className="grid h-14 w-full grid-cols-3 rounded-2xl p-1.5">
+            <TabsTrigger value="todas" className="h-11 rounded-xl px-1 text-sm">Todas</TabsTrigger>
+            <TabsTrigger value="retorno" className="h-11 rounded-xl px-1 text-sm">Para retorno</TabsTrigger>
+            <TabsTrigger value="aniversario" className="h-11 rounded-xl px-1 text-sm">Aniversários</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="retorno" className="mt-0"><ParaRetorno clientes={data} /></TabsContent>
@@ -77,10 +77,10 @@ function Page() {
             <ul className="mx-5 divide-y overflow-hidden rounded-2xl border bg-card">
               {lista.map((c) => (
                 <li key={c.id}>
-                  <Link to="/clientes/$id" params={{ id: c.id }} className="flex items-center justify-between px-4 py-4 active:bg-muted">
+                  <Link to="/clientes/$id" params={{ id: c.id }} className="flex items-center justify-between px-4 py-4 active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                     <div>
                       <div className="font-semibold">{c.nome}</div>
-                      {c.telefone && <div className="text-sm text-muted-foreground">{c.telefone}</div>}
+                      {c.telefone && <div className="text-sm text-muted-foreground tabular-nums">{formatarTelefone(c.telefone)}</div>}
                     </div>
                     <ChevronRight className="size-5 text-muted-foreground" />
                   </Link>
@@ -148,7 +148,7 @@ function ParaRetorno({ clientes }: { clientes: Cliente[] }) {
   return (
     <div className="space-y-4 px-5">
       <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">Pelo intervalo de cada cliente. Sem intervalo definido:</p>
+        <p className="text-sm text-muted-foreground">Sem intervalo na ficha, usar:</p>
         <div className="grid grid-cols-4 gap-2">
           {PRAZOS.map((p) => (
             <Button

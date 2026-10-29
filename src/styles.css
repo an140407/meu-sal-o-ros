@@ -44,6 +44,7 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-field: var(--field);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
   --color-chart-1: var(--chart-1);
@@ -72,32 +73,34 @@
   --card-foreground: oklch(0.27 0.025 15);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.27 0.025 15);
-  --primary: oklch(0.62 0.1 12);
+  --primary: oklch(0.56 0.1 12);
   --primary-foreground: oklch(0.99 0.004 20);
   --secondary: oklch(0.95 0.02 18);
   --secondary-foreground: oklch(0.38 0.06 12);
   --muted: oklch(0.955 0.01 30);
-  --muted-foreground: oklch(0.52 0.025 20);
+  --muted-foreground: oklch(0.48 0.025 20);
   --accent: oklch(0.93 0.03 15);
   --accent-foreground: oklch(0.35 0.06 12);
   --destructive: oklch(0.58 0.2 27);
   --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(0.91 0.015 20);
   --input: oklch(0.89 0.018 20);
-  --ring: oklch(0.62 0.1 12);
-  --chart-1: oklch(0.62 0.1 12);
+  /* Borda de campos de texto: contraste ≥ 3:1 com o fundo (WCAG 1.4.11). */
+  --field: oklch(0.66 0.02 20);
+  --ring: oklch(0.56 0.1 12);
+  --chart-1: oklch(0.56 0.1 12);
   --chart-2: oklch(0.7 0.05 60);
   --chart-3: oklch(0.5 0.04 20);
   --chart-4: oklch(0.8 0.06 30);
   --chart-5: oklch(0.6 0.08 350);
   --sidebar: oklch(0.985 0.006 20);
   --sidebar-foreground: oklch(0.27 0.025 15);
-  --sidebar-primary: oklch(0.62 0.1 12);
+  --sidebar-primary: oklch(0.56 0.1 12);
   --sidebar-primary-foreground: oklch(0.99 0 0);
   --sidebar-accent: oklch(0.95 0.02 18);
   --sidebar-accent-foreground: oklch(0.35 0.06 12);
   --sidebar-border: oklch(0.91 0.015 20);
-  --sidebar-ring: oklch(0.62 0.1 12);
+  --sidebar-ring: oklch(0.56 0.1 12);
   --gradient-rose: linear-gradient(135deg, oklch(0.93 0.04 15), oklch(0.97 0.015 50));
   --shadow-soft: 0 6px 24px -10px oklch(0.45 0.08 12 / 0.25);
 }
@@ -121,6 +124,7 @@
   --destructive-foreground: oklch(0.984 0.003 247.858);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
+  --field: oklch(1 0 0 / 30%);
   --ring: oklch(0.551 0.027 264.364);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
@@ -154,5 +158,9 @@
 
 @layer base {
   html, body { font-family: var(--font-sans); -webkit-tap-highlight-color: transparent; }
-  h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.01em; }
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+  /* Números alinhados (valores, horários, datas) em todo o app. */
+  body { font-variant-numeric: tabular-nums; }
+  h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.01em; text-wrap: balance; }
+  p { text-wrap: pretty; }
 }

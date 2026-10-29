@@ -2,15 +2,17 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { BarChart3, ChevronRight, LogOut } from "lucide-react";
+import { BarChart3, ChevronRight, Info, LogOut, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/app/ui-bits";
+import { ServicoForm, type Servico } from "@/components/app/ServicoForm";
 import { useConfig, useServicos } from "@/lib/data";
-import { brl, horaHM, parseValor } from "@/lib/format";
+import { brl, horaHM } from "@/lib/format";
+import { formatarDuracao } from "@/lib/texto";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/ajustes")({
   head: () => ({
@@ -33,7 +35,7 @@ function Page() {
     percentual_ana: "70", taxa_debito: "0", taxa_credito: "0", nome_dona: "Simone",
     hora_inicio: "08:00", hora_fim: "19:00",
   });
-  const [novo, setNovo] = useState({ nome: "", preco: "" });
+  const [editandoServico, setEditandoServico] = useState<Servico | "novo" | null>(null);
   const [salvando, setSalvando] = useState(false);
   const { user } = Route.useRouteContext();
 
@@ -65,22 +67,6 @@ function Page() {
     toast.success("Ajustes salvos. Valem para os próximos atendimentos.");
   }
 
-  async function addServico(e: React.FormEvent) {
-    e.preventDefault();
-    const preco = parseValor(novo.preco || "0");
-    if (!novo.nome.trim() || !Number.isFinite(preco) || preco < 0) return void toast.error("Preencha nome e preço.");
-    const { error } = await supabase.from("servicos").insert({ nome: novo.nome.trim().slice(0, 80), preco_padrao: preco });
-    if (error) return void toast.error("Não foi possível adicionar.");
-    setNovo({ nome: "", preco: "" });
-    qc.invalidateQueries({ queryKey: ["servicos"] });
-  }
-
-  async function updServico(id: string, patch: { ativo?: boolean; preco_padrao?: number; duracao_min?: number }) {
-    const { error } = await supabase.from("servicos").update(patch).eq("id", id);
-    if (error) return void toast.error("Não foi possível salvar.");
-    qc.invalidateQueries({ queryKey: ["servicos"] });
-  }
-
   async function sair() {
     await qc.cancelQueries();
     qc.clear();
@@ -90,14 +76,14 @@ function Page() {
 
   const field = (k: keyof typeof f, label: string, mode: "decimal" | "text" = "decimal") => (
     <div className="space-y-2">
-      <Label>{label}</Label>
-      <Input className="h-12 text-base" inputMode={mode} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
+      <Label htmlFor={`cfg-${k}`}>{label}</Label>
+      <Input id={`cfg-${k}`} className="h-12 text-base" inputMode={mode} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
     </div>
   );
   const horaField = (k: "hora_inicio" | "hora_fim", label: string) => (
     <div className="space-y-2">
-      <Label>{label}</Label>
-      <Input className="h-12 text-base" type="time" required value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
+      <Label htmlFor={`cfg-${k}`}>{label}</Label>
+      <Input id={`cfg-${k}`} className="h-12 text-base" type="time" required value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
     </div>
   );
 
@@ -113,6 +99,12 @@ function Page() {
             {field("taxa_debito", "Taxa débito (%)")}
             {field("taxa_credito", "Taxa crédito (%)")}
           </div>
+          {(num(f.taxa_debito) === 0 || num(f.taxa_credito) === 0) && (
+            <p className="flex gap-2 rounded-xl bg-secondary p-3 text-sm text-secondary-foreground">
+              <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>Taxa em 0%: pagamentos no cartão entram sem desconto no líquido. Confira a taxa da sua maquininha.</span>
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-3">
             {horaField("hora_inicio", "Início do expediente")}
             {horaField("hora_fim", "Fim do expediente")}
@@ -121,66 +113,39 @@ function Page() {
         </form>
 
         <section className="space-y-3 rounded-2xl border bg-card p-4">
-          <h2 className="text-xl">Serviços</h2>
-          <ul className="divide-y">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl">Serviços</h2>
+            <Button type="button" variant="secondary" className="h-11 rounded-xl px-4" onClick={() => setEditandoServico("novo")}>
+              <Plus /> Novo
+            </Button>
+          </div>
+          <ul className="-mx-4 divide-y border-t">
             {servicos.map((s) => (
-              <li key={s.id} className="space-y-2 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className={s.ativo ? "font-medium" : "font-medium text-muted-foreground line-through"}>{s.nome}</div>
-                    <div className="text-xs text-muted-foreground">{brl(s.preco_padrao)} · {s.duracao_min} min</div>
-                  </div>
-                  <Switch checked={s.ativo} onCheckedChange={(c) => updServico(s.id, { ativo: c })} aria-label="Ativo" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Preço (R$)</Label>
-                    <Input
-                      className="h-11 text-base"
-                      inputMode="decimal"
-                      defaultValue={String(s.preco_padrao)}
-                      aria-label={`Preço de ${s.nome}`}
-                      onBlur={(e) => {
-                        const v = parseValor(e.target.value);
-                        if (Number.isFinite(v) && v >= 0 && v !== Number(s.preco_padrao)) updServico(s.id, { preco_padrao: v });
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Duração (min)</Label>
-                    <Input
-                      className="h-11 text-base"
-                      inputMode="numeric"
-                      defaultValue={String(s.duracao_min)}
-                      aria-label={`Duração de ${s.nome} em minutos`}
-                      onBlur={(e) => {
-                        const v = Number(e.target.value);
-                        if (v === s.duracao_min) return;
-                        if (!Number.isInteger(v) || v < 15 || v > 480) {
-                          e.target.value = String(s.duracao_min);
-                          return void toast.error("Use uma duração entre 15 e 480 minutos.");
-                        }
-                        updServico(s.id, { duracao_min: v });
-                      }}
-                    />
-                  </div>
-                </div>
+              <li key={s.id}>
+                <button
+                  type="button"
+                  onClick={() => setEditandoServico(s)}
+                  className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className={cn("block truncate font-medium", !s.ativo && "text-muted-foreground line-through")}>{s.nome}</span>
+                    <span className="block text-sm text-muted-foreground tabular-nums">
+                      {brl(s.preco_padrao)} · {formatarDuracao(s.duracao_min)}{!s.ativo ? " · inativo" : ""}
+                    </span>
+                  </span>
+                  <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+                </button>
               </li>
             ))}
           </ul>
-          <form onSubmit={addServico} className="flex gap-2">
-            <Input className="h-12 text-base" placeholder="Novo serviço" value={novo.nome} onChange={(e) => setNovo({ ...novo, nome: e.target.value })} />
-            <Input className="h-12 w-24 text-base" placeholder="R$" inputMode="decimal" value={novo.preco} onChange={(e) => setNovo({ ...novo, preco: e.target.value })} />
-            <Button type="submit" className="h-12 rounded-xl">Adicionar</Button>
-          </form>
         </section>
 
         <Link
           to="/estatisticas"
           className="flex h-14 items-center justify-between rounded-2xl border bg-card px-4 font-medium active:bg-muted"
         >
-          <span className="flex items-center gap-2"><BarChart3 className="size-5 text-primary" /> Estatísticas</span>
-          <ChevronRight className="size-5 text-muted-foreground" />
+          <span className="flex items-center gap-2"><BarChart3 className="size-5 text-primary" aria-hidden /> Estatísticas</span>
+          <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
         </Link>
 
         <div className="space-y-2">
@@ -192,6 +157,11 @@ function Page() {
           <Button variant="outline" className="h-12 w-full rounded-2xl" onClick={sair}><LogOut /> Sair</Button>
         </div>
       </div>
+      <ServicoForm
+        aberto={editandoServico !== null}
+        onAberto={(o) => !o && setEditandoServico(null)}
+        servico={editandoServico === "novo" ? null : editandoServico}
+      />
     </>
   );
 }

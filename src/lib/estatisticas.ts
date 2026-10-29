@@ -15,6 +15,15 @@ const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "s
 /** "2026-10" → "out/26" */
 export const mesCurto = (mes: string) => `${MESES_CURTOS[Number(mes.slice(5, 7)) - 1]}/${mes.slice(2, 4)}`;
 
+/**
+ * Tira os meses vazios do começo (antes do primeiro atendimento realizado), para o gráfico
+ * não abrir com barras zeradas. Sem nenhum mês com dados, devolve a lista inteira.
+ */
+export function aPartirDoPrimeiroMes<T extends { qtd: number }>(porMes: T[]): T[] {
+  const i = porMes.findIndex((m) => m.qtd > 0);
+  return i <= 0 ? porMes : porMes.slice(i);
+}
+
 export type AtendimentoEstat = {
   data: string;
   status: string;

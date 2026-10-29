@@ -13,6 +13,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Empty, PageHeader } from "@/components/app/ui-bits";
+import { SeletorMes } from "@/components/app/SeletorMes";
+import { plural } from "@/lib/texto";
 import { useDespesas, type Despesa } from "@/lib/data";
 import { CATEGORIAS_DESPESA, SEM_CATEGORIA, resumoDespesas } from "@/lib/despesas";
 import { brl, buscaMes, dataBR, hojeISO, mesAno, parseValor } from "@/lib/format";
@@ -46,24 +48,18 @@ function Page() {
         title="Despesas"
         voltar={
           // Sempre volta para o Acerto no mês escolhido aqui (sem usar o histórico).
-          <Link to="/acerto" search={{ mes }} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-            <ArrowLeft className="size-4" /> Acerto
+          <Link to="/acerto" search={{ mes }} className="-ml-2 inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <ArrowLeft className="size-4" aria-hidden /> Acerto
           </Link>
         }
       />
       <div className="space-y-5 px-5">
-        <Input
-          type="month"
-          className="h-12 text-base"
-          value={mes}
-          onChange={(e) => e.target.value && navigate({ search: { mes: e.target.value }, replace: true })}
-          aria-label="Mês"
-        />
+        <SeletorMes mes={mes} onChange={(m) => navigate({ search: { mes: m }, replace: true })} />
 
         <section className="rounded-2xl bg-rose-gradient p-4">
           <div className="mb-2 flex items-baseline justify-between">
             <h2 className="text-xl">{mesAno(mes)}</h2>
-            <span className="text-sm text-muted-foreground">{despesas.length} despesa(s)</span>
+            <span className="text-sm text-muted-foreground">{plural(despesas.length, "despesa", "despesas")}</span>
           </div>
           {isLoading ? <p className="text-muted-foreground">Carregando...</p> : (
             <div className="divide-y divide-border">
@@ -175,12 +171,12 @@ function DespesaForm({
           </DrawerHeader>
           <form onSubmit={salvar} className="space-y-4 overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Input className="h-12 text-base" required maxLength={200} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
+              <Label htmlFor="desp-descricao">Descrição</Label>
+              <Input id="desp-descricao" className="h-12 text-base" required maxLength={200} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>Categoria</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <Label id="desp-categoria">Categoria</Label>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="desp-categoria">
                 {CATEGORIAS_DESPESA.map((c) => (
                   <Button
                     key={c}
@@ -197,12 +193,12 @@ function DespesaForm({
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Valor (R$)</Label>
-                <Input className="h-12 text-base" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} />
+                <Label htmlFor="desp-valor-r">Valor (R$)</Label>
+                <Input id="desp-valor-r" className="h-12 text-base" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>Data</Label>
-                <Input className="h-12 text-base" type="date" required value={data} onChange={(e) => setData(e.target.value)} />
+                <Label htmlFor="desp-data">Data</Label>
+                <Input id="desp-data" className="h-12 text-base" type="date" required value={data} onChange={(e) => setData(e.target.value)} />
               </div>
             </div>
             <Button type="submit" size="xl" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>

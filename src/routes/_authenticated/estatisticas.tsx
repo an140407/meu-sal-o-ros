@@ -9,7 +9,8 @@ import {
 import { Empty, PageHeader } from "@/components/app/ui-bits";
 import { Voltar } from "@/components/app/Voltar";
 import { proximoMes, useAtendimentosPeriodo } from "@/lib/data";
-import { estatisticas, mesCurto, mesesPeriodo, type Ranking } from "@/lib/estatisticas";
+import { aPartirDoPrimeiroMes, estatisticas, mesCurto, mesesPeriodo, type Ranking } from "@/lib/estatisticas";
+import { plural } from "@/lib/texto";
 import { brl, hojeISO, mesAno } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/estatisticas")({
@@ -42,6 +43,8 @@ function Page() {
   const { data = [], isLoading } = useAtendimentosPeriodo(`${meses[0]}-01`, proximoMes(meses[meses.length - 1]!));
   const e = estatisticas(data, meses, hojeISO());
   const vazio = e.realizados === 0 && e.totalAgendamentos === 0;
+  const porMes = aPartirDoPrimeiroMes(e.porMes);
+  const cortado = porMes.length < e.porMes.length;
 
   return (
     <>
@@ -67,7 +70,7 @@ function Page() {
 
         {isLoading ? <Empty>Carregando...</Empty> : vazio ? (
           <div className="flex flex-col items-center gap-2 rounded-2xl bg-rose-gradient px-5 py-10 text-center">
-            <BarChart3 className="size-8 text-primary" />
+            <BarChart3 className="size-8 text-primary" aria-hidden />
             <p className="font-semibold">Ainda não há atendimentos neste período</p>
             <p className="text-sm text-muted-foreground">Conforme você concluir atendimentos, os números aparecem aqui.</p>
           </div>
@@ -82,19 +85,21 @@ function Page() {
                 <Tile
                   label="Faltas e cancelamentos"
                   valor={pct(e.taxaFaltasCancelamentos)}
-                  detalhe={`${e.faltas} falta(s) e ${e.cancelados} cancelamento(s) em ${e.totalAgendamentos} agendamento(s)`}
+                  detalhe={`${plural(e.faltas, "falta", "faltas")} e ${plural(e.cancelados, "cancelamento", "cancelamentos")} em ${plural(e.totalAgendamentos, "agendamento", "agendamentos")}`}
                 />
               </div>
             </div>
 
             <section className="rounded-2xl border bg-card p-4">
               <h2 className="text-xl">Faturamento por mês</h2>
-              <p className="mb-3 text-sm text-muted-foreground">Só atendimentos realizados.</p>
+              <p className="mb-3 text-sm text-muted-foreground">
+                Só atendimentos realizados{cortado ? ` · desde ${mesAno(porMes[0]!.mes).toLowerCase().replace(" ", " de ")}` : ""}.
+              </p>
               <ChartContainer config={chartConfig} className="aspect-[4/3] w-full">
-                <BarChart data={e.porMes} margin={{ left: 0, right: 4, top: 8 }} barGap={2} barCategoryGap="20%">
+                <BarChart data={porMes} margin={{ left: 0, right: 4, top: 8 }} barGap={2} barCategoryGap="20%">
                   <CartesianGrid vertical={false} />
                   <XAxis dataKey="mes" tickFormatter={mesCurto} tickLine={false} axisLine={false} tickMargin={8} interval="preserveStartEnd" />
-                  <YAxis tickFormatter={(v: number) => compacto.format(v)} tickLine={false} axisLine={false} width={40} />
+                  <YAxis tickFormatter={(v: number) => compacto.format(v)} tickLine={false} axisLine={false} width={56} />
                   <ChartTooltip
                     cursor={{ fillOpacity: 0.5 }}
                     content={
@@ -128,7 +133,7 @@ function Page() {
                   </tr>
                 </thead>
                 <tbody className="divide-y tabular-nums">
-                  {[...e.porMes].reverse().map((m) => (
+                  {[...porMes].reverse().map((m) => (
                     <tr key={m.mes}>
                       <td className="py-1.5">{mesCurto(m.mes)}</td>
                       <td className="py-1.5 text-right">{m.qtd}</td>
@@ -167,7 +172,7 @@ function Top({ titulo, itens, vazio }: { titulo: string; itens: Ranking[]; vazio
         <ol className="divide-y">
           {itens.map((r, i) => (
             <li key={r.id} className="flex items-center gap-3 py-2.5">
-              <span className="w-5 shrink-0 text-sm font-semibold text-muted-foreground">{i + 1}</span>
+              <span className="w-5 shrink-0 text-sm font-semibold text-muted-foreground tabular-nums">{i + 1}</span>
               <span className="min-w-0 flex-1 truncate font-medium">{r.nome}</span>
               <span className="shrink-0 text-right text-sm tabular-nums">
                 <span className="font-semibold">{r.qtd}×</span>

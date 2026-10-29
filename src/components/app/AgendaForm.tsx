@@ -260,9 +260,9 @@ export function AgendaForm({
             ) : (
               <form onSubmit={salvar} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Cliente</Label>
+                  <Label htmlFor="ag-cliente">Cliente</Label>
                   <div className="flex gap-2">
-                    <NativeSelect value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
+                    <NativeSelect id="ag-cliente" value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
                       <option value="">Selecione...</option>
                       {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                     </NativeSelect>
@@ -274,13 +274,15 @@ export function AgendaForm({
                 <AvisoSaude cliente={cliente} />
                 <ServicosPicker itens={itens} onChange={setItens} />
                 <div className="space-y-2">
-                  <Label>Data</Label>
-                  <Input className="h-12 text-base" type="date" required value={data} onChange={(e) => setData(e.target.value)} />
+                  <Label htmlFor="ag-data">Data</Label>
+                  <Input id="ag-data" className="h-12 text-base" type="date" required value={data} onChange={(e) => setData(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label id="horarios-livres">Horários livres</Label>
-                  {carregandoDia ? (
-                    <p className="text-sm text-muted-foreground">Carregando horários...</p>
+                  {itens.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Escolha um serviço para ver os horários livres.</p>
+                  ) : carregandoDia ? (
+                    <p className="text-sm text-muted-foreground">Carregando horários…</p>
                   ) : livres.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Sem horários livres neste dia.</p>
                   ) : (
@@ -292,7 +294,7 @@ export function AgendaForm({
                           aria-pressed={hora === h}
                           onClick={() => setHora(h)}
                           className={cn(
-                            "h-10 shrink-0 rounded-full border px-4 text-base tabular-nums",
+                            "h-11 shrink-0 rounded-full border px-4 text-base tabular-nums transition-transform duration-150 ease-out active:scale-[0.97] motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                             hora === h ? "border-primary bg-primary text-primary-foreground" : "bg-card active:bg-muted",
                           )}
                         >
@@ -303,8 +305,8 @@ export function AgendaForm({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Hora</Label>
-                  <Input className="h-12 text-base" type="time" step={60} required value={hora} onChange={(e) => setHora(e.target.value)} />
+                  <Label htmlFor="ag-hora">Hora</Label>
+                  <Input id="ag-hora" className="h-12 text-base" type="time" step={60} required value={hora} onChange={(e) => setHora(e.target.value)} />
                 </div>
 
                 {!editing && (
@@ -357,8 +359,8 @@ export function AgendaForm({
                 )}
 
                 <div className="space-y-2">
-                  <Label>Observações</Label>
-                  <Textarea value={obs} onChange={(e) => setObs(e.target.value)} maxLength={1000} className="text-base" />
+                  <Label htmlFor="ag-observacoes">Observações</Label>
+                  <Textarea id="ag-observacoes" value={obs} onChange={(e) => setObs(e.target.value)} maxLength={1000} className="text-base" />
                 </div>
                 <Button type="submit" size="xl" disabled={saving || excluindo}>{rotuloBotao}</Button>
                 {editing && (

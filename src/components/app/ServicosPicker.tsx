@@ -5,6 +5,7 @@ import { NativeSelect } from "./ui-bits";
 import { useServicos } from "@/lib/data";
 import { brl } from "@/lib/format";
 import { novaChave, totaisForm, type ItemForm } from "@/lib/itens";
+import { formatarDuracao } from "@/lib/texto";
 
 /**
  * Serviços de um atendimento: lista editável (valor em R$ e duração) + "Adicionar serviço".
@@ -20,9 +21,9 @@ export function ServicosPicker({ itens, onChange }: { itens: ItemForm[]; onChang
 
   return (
     <div className="space-y-2">
-      <Label>Serviços</Label>
+      <Label id="servicos-rotulo">Serviços</Label>
       {itens.length > 0 && (
-        <ul className="space-y-2">
+        <ul className="space-y-2" aria-labelledby="servicos-rotulo">
           {itens.map((i) => (
             <li key={i.key} className="rounded-xl border bg-card p-3">
               <div className="flex items-center justify-between gap-2">
@@ -30,15 +31,15 @@ export function ServicosPicker({ itens, onChange }: { itens: ItemForm[]; onChang
                 <button
                   type="button"
                   onClick={() => onChange(itens.filter((x) => x.key !== i.key))}
-                  className="-mr-1 flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground active:bg-muted"
+                  className="-mr-2 flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   aria-label={`Remover ${i.nome}`}
                 >
-                  <X className="size-5" />
+                  <X className="size-5" aria-hidden />
                 </button>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Valor (R$)</span>
+                  <span className="text-xs text-muted-foreground" aria-hidden>Valor (R$)</span>
                   <Input
                     className="h-11 text-base"
                     inputMode="decimal"
@@ -48,7 +49,7 @@ export function ServicosPicker({ itens, onChange }: { itens: ItemForm[]; onChang
                   />
                 </div>
                 <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Duração (min)</span>
+                  <span className="text-xs text-muted-foreground" aria-hidden>Duração (min)</span>
                   <Input
                     className="h-11 text-base"
                     inputMode="numeric"
@@ -78,7 +79,7 @@ export function ServicosPicker({ itens, onChange }: { itens: ItemForm[]; onChang
         {ativos.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
       </NativeSelect>
       <div className="flex justify-between rounded-xl bg-secondary px-3 py-2 text-sm">
-        <span className="text-secondary-foreground">Total · {duracao} min</span>
+        <span className="text-secondary-foreground">Total · {formatarDuracao(duracao)}</span>
         <span className="font-semibold tabular-nums">{brl(valor)}</span>
       </div>
     </div>

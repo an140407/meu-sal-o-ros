@@ -14,11 +14,13 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PageHeader, Empty } from "@/components/app/ui-bits";
+import { SeletorMes } from "@/components/app/SeletorMes";
 import { useAtendimentos, useAtendimentosMes, useConfig, useDespesas, useRepasses, useRepassesTodos, type Repasse } from "@/lib/data";
 import { saldoPorMes } from "@/lib/acerto";
 import { resumoDespesas } from "@/lib/despesas";
 import { nomesItens } from "@/lib/itens";
 import { partesTexto, totaisPorForma } from "@/lib/pagamentos";
+import { plural } from "@/lib/texto";
 import { cn } from "@/lib/utils";
 import { brl, buscaMes, dataBR, dataHora, formaLabel, hojeISO, mesAno, parseValor, type Forma } from "@/lib/format";
 
@@ -102,14 +104,14 @@ function Page() {
     <>
       <PageHeader title="Acerto" />
       <div className="space-y-5 px-5">
-        <Input type="month" className="h-12 text-base" value={mes} onChange={(e) => e.target.value && setMes(e.target.value)} aria-label="Mês" />
+        <SeletorMes mes={mes} onChange={setMes} max={hojeISO().slice(0, 7)} />
 
         <MesesAnteriores mes={mes} onSelect={setMes} />
 
         <section className="rounded-2xl bg-rose-gradient p-4">
           <div className="mb-2 flex items-baseline justify-between">
             <h2 className="text-xl">{mesAno(mes)}</h2>
-            <span className="text-sm text-muted-foreground">{atends.length} atend.</span>
+            <span className="text-sm text-muted-foreground">{plural(atends.length, "atendimento", "atendimentos")}</span>
           </div>
           {isLoading ? <p className="text-muted-foreground">Carregando...</p> : (
             <div className="divide-y divide-border">
@@ -177,7 +179,7 @@ function Page() {
           to="/estatisticas"
           className="flex h-14 items-center justify-between rounded-2xl border bg-card px-4 font-medium active:bg-muted"
         >
-          <span className="flex items-center gap-2"><BarChart3 className="size-5 text-primary" /> Estatísticas</span>
+          <span className="flex items-center gap-2"><BarChart3 className="size-5 text-primary" aria-hidden /> Estatísticas</span>
           <ChevronRight className="size-5 text-muted-foreground" />
         </Link>
 
@@ -188,7 +190,7 @@ function Page() {
             <ul className="divide-y overflow-hidden rounded-2xl border bg-card">
               {repasses.map((r) => (
                 <li key={r.id}>
-                  <button onClick={() => { setEditing(r); setOpen(true); }} className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left active:bg-muted">
+                  <button type="button" onClick={() => { setEditing(r); setOpen(true); }} className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                     <div className="min-w-0">
                       <div className="font-semibold">{dataBR(r.data_recebimento)}</div>
                       {r.observacao && <div className="truncate text-sm text-muted-foreground">{r.observacao}</div>}
@@ -230,7 +232,7 @@ function MesesAnteriores({ mes, onSelect }: { mes: string; onSelect: (m: string)
         <div>
           <h2 className="text-xl">Meses anteriores</h2>
           <p className="text-sm text-muted-foreground">
-            {pendentes.length === 0 ? "Tudo acertado." : `${pendentes.length} mês(es) com saldo`}
+            {pendentes.length === 0 ? "Tudo acertado." : `${plural(pendentes.length, "mês", "meses")} com saldo`}
           </p>
         </div>
         <div className="flex items-center gap-2 text-right">
@@ -323,17 +325,17 @@ function RepasseForm({
           <form onSubmit={salvar} className="space-y-4 overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Valor (R$)</Label>
-                <Input className="h-12 text-base" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} />
+                <Label htmlFor="rep-valor-r">Valor (R$)</Label>
+                <Input id="rep-valor-r" className="h-12 text-base" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>Data</Label>
-                <Input className="h-12 text-base" type="date" required value={data} onChange={(e) => setData(e.target.value)} />
+                <Label htmlFor="rep-data">Data</Label>
+                <Input id="rep-data" className="h-12 text-base" type="date" required value={data} onChange={(e) => setData(e.target.value)} />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Observação</Label>
-              <Textarea value={obs} onChange={(e) => setObs(e.target.value)} maxLength={500} className="text-base" />
+              <Label htmlFor="rep-observacao">Observação</Label>
+              <Textarea id="rep-observacao" value={obs} onChange={(e) => setObs(e.target.value)} maxLength={500} className="text-base" />
             </div>
             <Button type="submit" size="xl" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
             {editing && (

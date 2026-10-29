@@ -75,7 +75,7 @@ export function RecorrenciaPicker({
     <div className="space-y-4">
       <div className="space-y-2">
         <span id={`${id}-cada`} className="text-sm font-medium">A cada</span>
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" role="radiogroup" aria-labelledby={`${id}-cada`}>
+        <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-labelledby={`${id}-cada`}>
           {INTERVALOS.map((n) => (
             <button
               key={n}
@@ -84,7 +84,7 @@ export function RecorrenciaPicker({
               aria-checked={!outro && intervalo === n}
               onClick={() => { setOutro(false); onIntervalo(n); }}
               className={cn(
-                "h-11 shrink-0 rounded-full border px-4 text-base tabular-nums transition-transform duration-150 ease-out active:scale-[0.97] motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                "h-11 rounded-full border px-2 text-base tabular-nums transition-transform duration-150 ease-out active:scale-[0.97] motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 !outro && intervalo === n ? "border-primary bg-primary font-semibold text-primary-foreground" : "bg-card",
               )}
             >
@@ -97,7 +97,7 @@ export function RecorrenciaPicker({
             aria-checked={outro}
             onClick={() => { setOutro(true); setTextoIntervalo(String(intervalo)); }}
             className={cn(
-              "h-11 shrink-0 rounded-full border px-4 text-base transition-transform duration-150 ease-out active:scale-[0.97] motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              "h-11 rounded-full border px-2 text-base transition-transform duration-150 ease-out active:scale-[0.97] motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               outro ? "border-primary bg-primary font-semibold text-primary-foreground" : "bg-card",
             )}
           >

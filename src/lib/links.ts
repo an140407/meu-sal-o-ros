@@ -11,6 +11,16 @@ export function normalizarTelefone(telefone: string | null | undefined): string 
   return null;
 }
 
+/** Telefone para leitura: "(11) 98765-4321" / "(11) 3456-7890". Fora do padrão, devolve como foi digitado. */
+export function formatarTelefone(telefone: string | null | undefined): string {
+  const bruto = (telefone ?? "").trim();
+  let d = bruto.replace(/\D/g, "");
+  if (d.startsWith("55") && (d.length === 12 || d.length === 13)) d = d.slice(2);
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return bruto;
+}
+
 export const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0] ?? "";
 
 /** Link do WhatsApp (mensagem opcional), ou null se o telefone não é válido. */

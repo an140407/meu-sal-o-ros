@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  linkGoogleAgenda, linkWhatsapp, linkWhatsappTexto, mensagemAniversario, mensagemRetorno, normalizarTelefone,
+  formatarTelefone, linkGoogleAgenda, linkWhatsapp, linkWhatsappTexto, mensagemAniversario, mensagemRetorno, normalizarTelefone,
 } from "./links";
 
 describe("normalizarTelefone", () => {
@@ -118,5 +118,17 @@ describe("mensagens de retorno e aniversário", () => {
     expect(linkWhatsappTexto("", "oi")).toBeNull();
     expect(linkWhatsappTexto("(11) 98765-4321")).toBe("https://wa.me/5511987654321");
     expect(linkWhatsappTexto("(11) 98765-4321", "")).toBe("https://wa.me/5511987654321");
+  });
+});
+
+describe("formatarTelefone", () => {
+  it("celular, fixo e com DDI", () => {
+    expect(formatarTelefone("11987654321")).toBe("(11) 98765-4321");
+    expect(formatarTelefone("(11) 3456 7890")).toBe("(11) 3456-7890");
+    expect(formatarTelefone("+55 11 98765-4321")).toBe("(11) 98765-4321");
+  });
+  it("fora do padrão volta como foi digitado", () => {
+    expect(formatarTelefone(" 98765-4321 ")).toBe("98765-4321");
+    expect(formatarTelefone(null)).toBe("");
   });
 });

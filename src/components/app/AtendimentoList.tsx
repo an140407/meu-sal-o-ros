@@ -1,7 +1,8 @@
-import { brl, dataHora, mesAno } from "@/lib/format";
+import { brl, dataBR, horaHM, mesAno } from "@/lib/format";
 import type { Atendimento } from "@/lib/data";
 import { nomesItens } from "@/lib/itens";
 import { formasLabel } from "@/lib/pagamentos";
+import { plural } from "@/lib/texto";
 
 export function AtendimentoList({
   itens, onSelect, mostrarCliente = true, nomeDona,
@@ -27,7 +28,7 @@ export function AtendimentoList({
             <div className="mb-2 rounded-2xl bg-rose-gradient p-4">
               <div className="flex items-baseline justify-between">
                 <h2 className="text-xl">{mesAno(mes)}</h2>
-                <span className="text-sm text-muted-foreground">{lista.length} atend.</span>
+                <span className="text-sm text-muted-foreground">{plural(lista.length, "atendimento", "atendimentos")}</span>
               </div>
               {nomeDona !== undefined && (
                 <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
@@ -40,19 +41,27 @@ export function AtendimentoList({
             <ul className="divide-y overflow-hidden rounded-2xl border bg-card">
               {lista.map((a) => (
                 <li key={a.id}>
-                  <button onClick={() => onSelect(a)} className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left active:bg-muted">
-                    <div className="min-w-0">
-                      <div className="truncate font-semibold">
-                        {mostrarCliente ? a.clientes?.nome ?? "—" : nomesItens(a.itens)}
+                  <button
+                    type="button"
+                    onClick={() => onSelect(a)}
+                    className="flex w-full items-start justify-between gap-3 px-4 py-3.5 text-left active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  >
+                    <div className="min-w-0 flex-1">
+                      {mostrarCliente ? (
+                        <div className="truncate font-semibold">{a.clientes?.nome ?? "—"}</div>
+                      ) : (
+                        <div className="line-clamp-2 font-semibold">{nomesItens(a.itens)}</div>
+                      )}
+                      <div className="text-sm text-muted-foreground tabular-nums">
+                        {dataBR(a.data).slice(0, 5)}{a.hora ? ` · ${horaHM(a.hora)}` : ""}
                       </div>
-                      <div className="truncate text-sm text-muted-foreground">
-                        {dataHora(a.data, a.hora)} · {mostrarCliente ? `${nomesItens(a.itens)} · ` : ""}{formasLabel(a.pagamentos)}
-                      </div>
+                      {mostrarCliente && <div className="line-clamp-2 text-sm text-muted-foreground">{nomesItens(a.itens)}</div>}
                     </div>
                     <div className="shrink-0 text-right">
-                      <div className="font-semibold">{brl(a.valor_bruto)}</div>
-                      {Number(a.taxa_percentual) > 0 && (
-                        <div className="text-xs text-muted-foreground">líq. {brl(a.valor_liquido)}</div>
+                      <div className="font-semibold tabular-nums">{brl(a.valor_bruto)}</div>
+                      <div className="text-xs text-muted-foreground">{formasLabel(a.pagamentos)}</div>
+                      {Number(a.valor_liquido) < Number(a.valor_bruto) && (
+                        <div className="text-xs text-muted-foreground tabular-nums">líq. {brl(a.valor_liquido)}</div>
                       )}
                     </div>
                   </button>

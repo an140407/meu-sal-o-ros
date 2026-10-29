@@ -63,26 +63,26 @@ export function ClienteForm({
 
   const txt = (k: "alergias" | "problema_unhas" | "medicamentos" | "observacoes", label: string) => (
     <div className="space-y-2">
-      <Label>{label}</Label>
-      <Textarea value={v[k] ?? ""} onChange={(e) => set(k, e.target.value)} maxLength={1000} className="text-base" />
+      <Label htmlFor={`cli-${k}`}>{label}</Label>
+      <Textarea id={`cli-${k}`} value={v[k] ?? ""} onChange={(e) => set(k, e.target.value)} maxLength={1000} className="text-base" />
     </div>
   );
 
   return (
     <form onSubmit={submit} className="space-y-4">
       <div className="space-y-2">
-        <Label>Nome *</Label>
-        <Input className="h-12 text-base" value={v.nome} onChange={(e) => set("nome", e.target.value)} />
+        <Label htmlFor="cli-nome">Nome *</Label>
+        <Input id="cli-nome" className="h-12 text-base" value={v.nome} onChange={(e) => set("nome", e.target.value)} />
       </div>
       <div className="space-y-2">
-        <Label>Telefone</Label>
-        <Input className="h-12 text-base" type="tel" inputMode="tel" value={v.telefone ?? ""} onChange={(e) => set("telefone", e.target.value)} />
+        <Label htmlFor="cli-telefone">Telefone</Label>
+        <Input id="cli-telefone" className="h-12 text-base" type="tel" inputMode="tel" value={v.telefone ?? ""} onChange={(e) => set("telefone", e.target.value)} />
       </div>
       {!compact && (
         <>
           <div className="space-y-2">
-            <Label>Data de nascimento</Label>
-            <Input className="h-12 text-base" type="date" value={v.data_nascimento ?? ""} onChange={(e) => set("data_nascimento", e.target.value || null)} />
+            <Label htmlFor="cli-data-de-nascimento">Data de nascimento</Label>
+            <Input id="cli-data-de-nascimento" className="h-12 text-base" type="date" value={v.data_nascimento ?? ""} onChange={(e) => set("data_nascimento", e.target.value || null)} />
           </div>
           <h3 className="pt-2 text-xl">Anamnese</h3>
           {txt("alergias", "Alergias")}

@@ -9,9 +9,9 @@ export function Voltar({ label, fallback }: { label: string; fallback: () => voi
     <button
       type="button"
       onClick={() => (canGoBack ? router.history.back() : fallback())}
-      className="inline-flex items-center gap-1 text-sm text-muted-foreground"
+      className="-ml-2 inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <ArrowLeft className="size-4" /> {label}
+      <ArrowLeft className="size-4" aria-hidden /> {label}
     </button>
   );
 }

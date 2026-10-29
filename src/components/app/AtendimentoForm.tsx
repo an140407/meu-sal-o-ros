@@ -140,9 +140,9 @@ export function AtendimentoForm({
             ) : (
               <form onSubmit={salvar} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Cliente</Label>
+                  <Label htmlFor="at-cliente">Cliente</Label>
                   <div className="flex gap-2">
-                    <NativeSelect value={clienteId} onChange={(e) => setClienteId(e.target.value)} disabled={!!clienteFixo}>
+                    <NativeSelect id="at-cliente" value={clienteId} onChange={(e) => setClienteId(e.target.value)} disabled={!!clienteFixo}>
                       <option value="">Selecione...</option>
                       {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                     </NativeSelect>
@@ -156,18 +156,18 @@ export function AtendimentoForm({
                 <ServicosPicker itens={itens} onChange={setItens} />
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>Data</Label>
-                    <Input className="h-12 text-base" type="date" required value={data} onChange={(e) => setData(e.target.value)} />
+                    <Label htmlFor="at-data">Data</Label>
+                    <Input id="at-data" className="h-12 text-base" type="date" required value={data} onChange={(e) => setData(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Hora</Label>
-                    <Input className="h-12 text-base" type="time" step={60} value={hora} onChange={(e) => setHora(e.target.value)} />
+                    <Label htmlFor="at-hora">Hora</Label>
+                    <Input id="at-hora" className="h-12 text-base" type="time" step={60} value={hora} onChange={(e) => setHora(e.target.value)} />
                   </div>
                 </div>
                 <PagamentosPicker total={total} partes={partes} onChange={setPartes} taxas={taxas} />
                 <div className="space-y-2">
-                  <Label>Observações</Label>
-                  <Textarea value={obs} onChange={(e) => setObs(e.target.value)} maxLength={1000} className="text-base" />
+                  <Label htmlFor="at-observacoes">Observações</Label>
+                  <Textarea id="at-observacoes" value={obs} onChange={(e) => setObs(e.target.value)} maxLength={1000} className="text-base" />
                 </div>
                 <Button type="submit" size="xl" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
                 {editing && (

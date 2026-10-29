@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estatisticas, mesCurto, mesesPeriodo, type AtendimentoEstat } from "./estatisticas";
+import { aPartirDoPrimeiroMes, estatisticas, mesCurto, mesesPeriodo, type AtendimentoEstat } from "./estatisticas";
 
 describe("mesesPeriodo", () => {
   it("lista os últimos n meses, virando o ano", () => {
@@ -128,5 +128,16 @@ describe("estatisticas", () => {
     expect(e.ticketMedio).toBe(0);
     expect(e.taxaFaltasCancelamentos).toBe(0);
     expect(e.porMes.map((m) => m.bruto)).toEqual([0, 0]);
+  });
+});
+
+describe("aPartirDoPrimeiroMes", () => {
+  it("corta só os meses vazios do começo", () => {
+    const m = [{ mes: "a", qtd: 0 }, { mes: "b", qtd: 2 }, { mes: "c", qtd: 0 }, { mes: "d", qtd: 1 }];
+    expect(aPartirDoPrimeiroMes(m).map((x) => x.mes)).toEqual(["b", "c", "d"]);
+  });
+  it("sem dados ou já começando com dados, mantém tudo", () => {
+    expect(aPartirDoPrimeiroMes([{ qtd: 0 }, { qtd: 0 }])).toHaveLength(2);
+    expect(aPartirDoPrimeiroMes([{ qtd: 1 }, { qtd: 0 }])).toHaveLength(2);
   });
 });

@@ -17,8 +17,9 @@ import { AtendimentoList } from "@/components/app/AtendimentoList";
 import { AtendimentoForm } from "@/components/app/AtendimentoForm";
 import { useAtendimentos, useClientes, useMembrosSeries, useProximosDaCliente, type Atendimento, type Cliente } from "@/lib/data";
 import { intervaloValido, posicaoNaSerie } from "@/lib/recorrencia";
+import { plural } from "@/lib/texto";
 import { brl, dataBR, diaPorExtenso, hojeISO, horaDeMinutos, horaHM, minutos } from "@/lib/format";
-import { linkWhatsappTexto, normalizarTelefone } from "@/lib/links";
+import { formatarTelefone, linkWhatsappTexto, normalizarTelefone } from "@/lib/links";
 import { nomesItens } from "@/lib/itens";
 
 export const Route = createFileRoute("/_authenticated/clientes/$id")({
@@ -75,10 +76,10 @@ function Page() {
         <Link to="/clientes" className="inline-flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft className="size-4" /> Clientes</Link>
         <h1 className="mt-2 text-3xl">{c.nome}</h1>
         <p className="text-sm text-muted-foreground">
-          {hist.length} atendimento(s) · {brl(total)}
+          {plural(hist.length, "atendimento", "atendimentos")} · {brl(total)}
           {c.consentimento_data && ` · consentimento em ${dataBR(c.consentimento_data)}`}
         </p>
-        <p className="mt-3 text-base">{c.telefone || <span className="text-muted-foreground">Sem telefone</span>}</p>
+        <p className="mt-3 text-base tabular-nums">{c.telefone ? formatarTelefone(c.telefone) : <span className="text-muted-foreground">Sem telefone</span>}</p>
         <div className="mt-2 grid grid-cols-3 gap-2">
           <Button
             variant="outline"
@@ -102,9 +103,9 @@ function Page() {
         <RetornoDaCliente cliente={c} />
       </header>
       <Tabs defaultValue="historico" className="px-5 pt-4">
-        <TabsList className="grid h-12 w-full grid-cols-2 rounded-2xl">
-          <TabsTrigger value="historico" className="h-10 rounded-xl text-base">Histórico</TabsTrigger>
-          <TabsTrigger value="ficha" className="h-10 rounded-xl text-base">Ficha</TabsTrigger>
+        <TabsList className="grid h-14 w-full grid-cols-2 rounded-2xl p-1.5">
+          <TabsTrigger value="historico" className="h-11 rounded-xl text-base">Histórico</TabsTrigger>
+          <TabsTrigger value="ficha" className="h-11 rounded-xl text-base">Ficha</TabsTrigger>
         </TabsList>
         <TabsContent value="historico" className="-mx-5 mt-4 space-y-4">
           <div className="px-5">
@@ -119,11 +120,11 @@ function Page() {
                     <Link
                       to="/agenda"
                       search={{ dia: a.data }}
-                      className="flex items-center justify-between gap-3 px-4 py-3 active:bg-muted"
+                      className="flex items-start justify-between gap-3 px-4 py-3 active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                     >
                       <div className="min-w-0">
                         <div className="font-semibold">{diaPorExtenso(a.data)}</div>
-                        <div className="truncate text-sm text-muted-foreground">
+                        <div className="line-clamp-2 text-sm text-muted-foreground">
                           {a.hora ? `${horaHM(a.hora)}–${horaDeMinutos(minutos(a.hora) + a.duracao_min)} · ` : ""}
                           {nomesItens(a.itens)}
                         </div>
