@@ -15,6 +15,7 @@ import { clientesParaRetorno, ehAniversarioNoMes } from "@/lib/clientes";
 import { dataBR, hojeISO, mesAno } from "@/lib/format";
 import { linkWhatsappTexto, mensagemAniversario, mensagemRetorno } from "@/lib/links";
 import { nomesItens } from "@/lib/itens";
+import { plural } from "@/lib/texto";
 import { cn } from "@/lib/utils";
 
 const ABAS = ["todas", "retorno", "aniversario"] as const;
@@ -147,7 +148,7 @@ function ParaRetorno({ clientes }: { clientes: Cliente[] }) {
   return (
     <div className="space-y-4 px-5">
       <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">Última visita há mais de</p>
+        <p className="text-sm text-muted-foreground">Pelo intervalo de cada cliente. Sem intervalo definido:</p>
         <div className="grid grid-cols-4 gap-2">
           {PRAZOS.map((p) => (
             <Button
@@ -167,12 +168,17 @@ function ParaRetorno({ clientes }: { clientes: Cliente[] }) {
         <Empty>Ninguém para chamar de volta agora. 💅</Empty>
       ) : (
         <ul className="divide-y overflow-hidden rounded-2xl border bg-card">
-          {lista.map(({ cliente: c, dias, ultimoServico }) => (
+          {lista.map(({ cliente: c, dias, ultimoServico, prazo, prazoDaCliente, atraso }) => (
             <li key={c.id} className="space-y-3 px-4 py-4">
               <Link to="/clientes/$id" params={{ id: c.id }} className="block">
-                <div className="font-semibold">{c.nome}</div>
-                <div className="truncate text-sm text-muted-foreground">
-                  há {dias} dias{ultimoServico ? ` · ${ultimoServico}` : ""}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold">{c.nome}</span>
+                  <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900 tabular-nums">
+                    {plural(atraso, "dia atrasada", "dias atrasada")}
+                  </span>
+                </div>
+                <div className="line-clamp-2 text-sm text-muted-foreground">
+                  há {dias} dias · {prazoDaCliente ? `retorno a cada ${prazo}` : `padrão ${prazo}`}{ultimoServico ? ` · ${ultimoServico}` : ""}
                 </div>
               </Link>
               <div className="flex gap-2">

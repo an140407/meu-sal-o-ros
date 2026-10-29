@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { itensDoAtendimento, limitarDuracao, somaItens, type ItemServico } from "./itens";
 import { pagamentosDoAtendimento, type Pagamento } from "./pagamentos";
+import type { Membro, Ocupado } from "./recorrencia";
 import type { Forma } from "./format";
 
 export type Status = "agendado" | "realizado" | "cancelado" | "faltou";
@@ -146,6 +147,7 @@ export const useAtendimentosMes = (mes: string) =>
 export const useProximosDaCliente = (clienteId: string, hoje: string) =>
   useQuery({
     queryKey: ["atendimentos", "proximos", clienteId, hoje],
+    enabled: !!clienteId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("atendimentos")
@@ -289,4 +291,75 @@ export async function salvarAtendimentoComItens(
     .single();
   if (eLer) throw eLer;
   return { atendimento: comItens([lido])[0]!, duracaoAjustada: ajustada };
+}
+
+/** Agendamentos ativos (agendado/realizado) nas datas informadas, para avisar conflitos de uma série. */
+export const useOcupadosNasDatas = (datas: string[], ativo = true) =>
+  useQuery({
+    queryKey: ["atendimentos", "ocupados", datas.join(",")],
+    enabled: ativo && datas.length > 0,
+    queryFn: async (): Promise<Ocupado[]> => {
+      const { data, error } = await supabase
+        .from("atendimentos")
+        .select("id, data, hora, duracao_min, status, clientes(nome)")
+        .in("data", datas)
+        .in("status", STATUS_ATIVOS);
+      if (error) throw error;
+      return (data as unknown as (Omit<Ocupado, "cliente"> & { clientes: { nome: string } | null })[]).map((o) => ({
+        id: o.id, data: o.data, hora: o.hora, duracao_min: o.duracao_min, status: o.status, cliente: o.clientes?.nome ?? "outra cliente",
+      }));
+    },
+  });
+
+/** Todos os agendamentos das séries informadas (id, data, status), agrupados por serie_id. */
+export const useMembrosSeries = (serieIds: string[]) => {
+  const ids = [...new Set(serieIds)].sort();
+  return useQuery({
+    queryKey: ["atendimentos", "series", ids.join(",")],
+    enabled: ids.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("atendimentos")
+        .select("id, data, status, serie_id")
+        .in("serie_id", ids);
+      if (error) throw error;
+      const m = new Map<string, Membro[]>();
+      for (const a of data as Membro[]) m.set(a.serie_id!, [...(m.get(a.serie_id!) ?? []), a]);
+      return m;
+    },
+  });
+};
+
+/**
+ * Cria de 1 a 60 agendamentos de uma vez (mesma cliente, hora, duração e serviços), numa
+ * transação no banco. Com mais de uma data, todos ficam na mesma série. Guarda o intervalo
+ * na ficha da cliente.
+ */
+export async function criarAgendamentosRecorrentes(p: {
+  clienteId: string;
+  datas: string[];
+  hora: string;
+  duracao: number;
+  observacoes: string;
+  itens: ItemServico[];
+  intervaloDias: number;
+}): Promise<string[]> {
+  const { data, error } = await supabase.rpc("criar_agendamentos_recorrentes", {
+    p_cliente_id: p.clienteId,
+    p_datas: p.datas,
+    p_hora: p.hora,
+    p_duracao_min: limitarDuracao(p.duracao).duracao,
+    p_observacoes: p.observacoes,
+    p_itens: p.itens.map((i) => ({ servico_id: i.servico_id, nome: i.nome, valor: i.valor, duracao_min: i.duracao_min })),
+    p_intervalo_dias: p.intervaloDias,
+  });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Copia hora, duração, observações e serviços para os próximos 'agendado' da série. Devolve quantos mudaram. */
+export async function aplicarAosProximosDaSerie(atendimentoId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("aplicar_aos_proximos_da_serie", { p_atendimento_id: atendimentoId });
+  if (error) throw error;
+  return data ?? 0;
 }

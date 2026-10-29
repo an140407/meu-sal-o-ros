@@ -2,19 +2,32 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Ban, CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, MessageCircle, Pencil, Plus, RotateCcw, UserX } from "lucide-react";
+import { Ban, CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, MessageCircle, Pencil, Plus, Repeat, RotateCcw, UserX } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { PageHeader, Empty } from "@/components/app/ui-bits";
 import { AgendaForm, AvisoSaude } from "@/components/app/AgendaForm";
 import { AtendimentoForm } from "@/components/app/AtendimentoForm";
 import { ServicosPicker } from "@/components/app/ServicosPicker";
 import { PagamentosPicker } from "@/components/app/PagamentosPicker";
+import { RecorrenciaPicker } from "@/components/app/RecorrenciaPicker";
 import {
-  STATUS_ATIVOS, proximoMes, salvarAtendimentoComItens, useAgenda, useClientes, useConfig, type Atendimento, type Status,
+  STATUS_ATIVOS, criarAgendamentosRecorrentes, proximoMes, salvarAtendimentoComItens, useAgenda, useClientes, useConfig,
+  useMembrosSeries, useProximosDaCliente, type Atendimento, type Status,
 } from "@/lib/data";
+import {
+  INTERVALO_PADRAO, gerarDatas, intervaloDaSerie, posicaoNaSerie, proximosDaSerie, type Membro,
+} from "@/lib/recorrencia";
+import { plural } from "@/lib/texto";
 import { itensParaForm, nomesItens, somaItens, totaisForm, validarItens, type ItemForm } from "@/lib/itens";
 import { formaPrincipal, partesIniciais, validarPagamentos, type ParteForm } from "@/lib/pagamentos";
 import { mensagemErro } from "@/lib/erros";
@@ -75,6 +88,9 @@ function Page() {
   const { data: cfg } = useConfig();
   const { data: clientes = [] } = useClientes();
   const qc = useQueryClient();
+  const { data: series } = useMembrosSeries(semana.flatMap((a) => (a.serie_id ? [a.serie_id] : [])));
+  const membrosDe = (a: Atendimento) => (a.serie_id ? series?.get(a.serie_id) ?? [] : []);
+  const [cancelarSerie, setCancelarSerie] = useState<Atendimento | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Atendimento | null>(null);
@@ -145,21 +161,24 @@ function Page() {
 
   const [mudandoStatus, setMudandoStatus] = useState(false);
 
-  async function mudarStatus(a: Atendimento, status: Status, msg: string) {
+  /** Muda o status de `a` (e de `outros`, na mesma situação). O Desfazer volta exatamente esses ids. */
+  async function mudarStatus(a: Atendimento, status: Status, msg: string, outros: string[] = []) {
     if (mudandoStatus) return;
     setMudandoStatus(true);
+    const ids = [a.id, ...outros];
     const patch: TablesUpdate<"atendimentos"> & { status: Status } = { status };
-    const { error } = await supabase.from("atendimentos").update(patch).eq("id", a.id);
+    const { error } = await supabase.from("atendimentos").update(patch).in("id", ids);
     setMudandoStatus(false);
     if (error) return void toast.error("Não foi possível salvar.");
     setAcoes(null);
+    setCancelarSerie(null);
     qc.invalidateQueries({ queryKey: ["atendimentos"] });
     toast.success(msg, {
       action: {
         label: "Desfazer",
         onClick: async () => {
           const volta: TablesUpdate<"atendimentos"> & { status: Status } = { status: a.status };
-          const { error: e } = await supabase.from("atendimentos").update(volta).eq("id", a.id);
+          const { error: e } = await supabase.from("atendimentos").update(volta).in("id", ids);
           if (e) return void toast.error("Não foi possível desfazer.");
           qc.invalidateQueries({ queryKey: ["atendimentos"] });
         },
@@ -304,6 +323,7 @@ function Page() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <span className="font-semibold tabular-nums">{intervalo(a)}</span>
+                        <SeloSerie a={a} membros={membrosDe(a)} />
                         <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", STATUS[a.status].badge)}>
                           {STATUS[a.status].label}
                         </span>
@@ -334,6 +354,7 @@ function Page() {
                 </DrawerDescription>
               </DrawerHeader>
               <div className="space-y-3 overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
+                <QuadroSerie a={acoes} membros={membrosDe(acoes)} />
                 {acoes.status === "agendado" && <AvisoSaude cliente={clientes.find((c) => c.id === acoes.cliente_id)} />}
                 {acoes.status === "agendado" && (
                   <>
@@ -343,7 +364,18 @@ function Page() {
                     <Button size="xl" variant="outline" onClick={() => adicionarGoogleAgenda(acoes)}><CalendarPlus /> Adicionar ao Google Agenda</Button>
                     <div className="grid grid-cols-2 gap-3">
                       <Button variant="outline" className="h-14 rounded-2xl text-base" disabled={mudandoStatus} onClick={() => mudarStatus(acoes, "faltou", "Marcado como falta")}><UserX /> Faltou</Button>
-                      <Button variant="outline" className="h-14 rounded-2xl text-base text-destructive" disabled={mudandoStatus} onClick={() => mudarStatus(acoes, "cancelado", "Agendamento cancelado")}><Ban /> Cancelar</Button>
+                      <Button
+                        variant="outline"
+                        className="h-14 rounded-2xl text-base text-destructive"
+                        disabled={mudandoStatus}
+                        onClick={() =>
+                          proximosDaSerie(acoes.data, membrosDe(acoes)).length > 0
+                            ? setCancelarSerie(acoes)
+                            : mudarStatus(acoes, "cancelado", "Agendamento cancelado")
+                        }
+                      >
+                        <Ban /> Cancelar
+                      </Button>
                     </div>
                   </>
                 )}
@@ -365,6 +397,43 @@ function Page() {
         </DrawerContent>
       </Drawer>
 
+      <AlertDialog open={!!cancelarSerie} onOpenChange={(o) => !o && !mudandoStatus && setCancelarSerie(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar agendamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este horário faz parte de uma série. Concluídos e datas anteriores não mudam.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {cancelarSerie && (
+            <div className="grid gap-2">
+              <Button
+                variant="outline"
+                className="h-12 rounded-xl text-base text-destructive"
+                disabled={mudandoStatus}
+                onClick={() => mudarStatus(cancelarSerie, "cancelado", "Agendamento cancelado")}
+              >
+                Só este ({cancelarSerie.data.slice(8, 10)}/{cancelarSerie.data.slice(5, 7)})
+              </Button>
+              <Button
+                variant="outline"
+                className="h-12 rounded-xl text-base text-destructive"
+                disabled={mudandoStatus}
+                onClick={() => {
+                  const outros = proximosDaSerie(cancelarSerie.data, membrosDe(cancelarSerie)).map((m) => m.id);
+                  void mudarStatus(cancelarSerie, "cancelado", `${plural(outros.length + 1, "agendamento cancelado", "agendamentos cancelados")}`, outros);
+                }}
+              >
+                Este e os próximos ({proximosDaSerie(cancelarSerie.data, membrosDe(cancelarSerie)).length + 1})
+              </Button>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={mudandoStatus}>Voltar</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AgendaForm open={formOpen} onOpenChange={setFormOpen} editing={editing} dia={dia} horaSugerida={horaSugerida} clienteInicial={clienteInicial} />
       <ConcluirForm atendimento={concluir} onClose={() => setConcluir(null)} />
       <AtendimentoForm open={!!editRealizado} onOpenChange={(o) => !o && setEditRealizado(null)} editing={editRealizado} />
@@ -372,14 +441,58 @@ function Page() {
   );
 }
 
+/** "↻ 3 de 12" no card de um agendamento em série. */
+function SeloSerie({ a, membros }: { a: Atendimento; membros: Membro[] }) {
+  const pos = a.serie_id ? posicaoNaSerie(a.id, membros) : null;
+  if (!pos) return null;
+  return (
+    <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-primary tabular-nums">
+      <Repeat className="size-3.5" aria-hidden />
+      <span className="sr-only">Série, </span>{pos.n} de {pos.m}
+    </span>
+  );
+}
+
+/** Quadro "Série · a cada X dias · N de M · próxima dd/mm" nas ações do agendamento. */
+function QuadroSerie({ a, membros }: { a: Atendimento; membros: Membro[] }) {
+  const pos = a.serie_id ? posicaoNaSerie(a.id, membros) : null;
+  if (!pos) return null;
+  const cada = intervaloDaSerie(membros);
+  const proxima = proximosDaSerie(a.data, membros)[0];
+  return (
+    <div className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-2.5 text-sm text-secondary-foreground">
+      <Repeat className="size-4 shrink-0 text-primary" aria-hidden />
+      <span className="tabular-nums">
+        Série{cada ? ` · a cada ${cada} dias` : ""} · <b>{pos.n} de {pos.m}</b>
+        {proxima ? ` · próxima ${proxima.data.slice(8, 10)}/${proxima.data.slice(5, 7)}` : ""}
+      </span>
+    </div>
+  );
+}
+
 function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | null; onClose: () => void }) {
   const qc = useQueryClient();
+  const hoje = hojeISO();
   const { data: cfg } = useConfig();
+  const { data: clientes = [] } = useClientes();
   const [itens, setItens] = useState<ItemForm[]>([]);
   const [partes, setPartes] = useState<ParteForm[]>([]);
   const [saving, setSaving] = useState(false);
   const total = totaisForm(itens).valor;
+  const duracao = totaisForm(itens).duracao;
   const taxas = { debito: Number(cfg?.taxa_debito ?? 0), credito: Number(cfg?.taxa_credito ?? 0) };
+
+  // Retorno: oferecido quando a cliente não tem outro agendamento futuro.
+  const cliente = clientes.find((c) => c.id === atendimento?.cliente_id);
+  const { data: futuros, isLoading: carregandoFuturos } = useProximosDaCliente(atendimento?.cliente_id ?? "", hoje);
+  const jaTem = (futuros ?? []).find((p) => p.id !== atendimento?.id);
+  const [retorno, setRetorno] = useState(false);
+  const [intervalo, setIntervalo] = useState(INTERVALO_PADRAO);
+  const [vezes, setVezes] = useState(1);
+  const [inicio, setInicio] = useState(hoje);
+  const [horaRetorno, setHoraRetorno] = useState("");
+  const [puladas, setPuladas] = useState<Set<string>>(new Set());
+  const base = atendimento ? (atendimento.data > hoje ? atendimento.data : hoje) : hoje;
 
   useEffect(() => {
     if (!atendimento) return;
@@ -387,7 +500,25 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
     // Agendado ainda não tem partes de verdade (a forma é provisória): começa com Pix no total.
     const gravadas = atendimento.atendimento_pagamentos.length > 0 ? atendimento.pagamentos : [];
     setPartes(partesIniciais(gravadas, Number(atendimento.valor_bruto)));
+    setVezes(1);
+    setHoraRetorno(horaHM(atendimento.hora) || "09:00");
   }, [atendimento]);
+
+  // Intervalo e liga/desliga vêm da ficha da cliente.
+  useEffect(() => {
+    if (!atendimento) return;
+    setIntervalo(cliente?.retorno_dias ?? INTERVALO_PADRAO);
+    setRetorno(!!cliente?.retorno_dias);
+  }, [atendimento, cliente?.retorno_dias]);
+
+  // Primeira data do retorno = data do atendimento (ou hoje) + intervalo; muda junto com o intervalo.
+  useEffect(() => {
+    setInicio(somarDias(base, intervalo));
+    setPuladas(new Set());
+  }, [base, intervalo]);
+
+  const oferecerRetorno = !!atendimento && !carregandoFuturos && !jaTem;
+  const agendarRetorno = oferecerRetorno && retorno;
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
@@ -396,6 +527,7 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
     if ("erro" in v) return void toast.error(v.erro);
     const pg = validarPagamentos(partes, somaItens(v.itens).valor);
     if ("erro" in pg) return void toast.error(pg.erro);
+    if (agendarRetorno && !horaRetorno) return void toast.error("Informe a hora do retorno.");
     setSaving(true);
     try {
       // O total vem da soma dos itens; o líquido, das taxas de cada parte (calculados no banco).
@@ -407,15 +539,35 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
       );
       toast.success(`Atendimento concluído · ${brl(lido.valor_bruto)}`);
       if (duracaoAjustada) toast.warning(`A duração total foi limitada a ${lido.duracao_min} min.`);
-      onClose();
     } catch (err) {
       console.error(err);
       toast.error(mensagemErro(err, "Não foi possível concluir."));
-    } finally {
       setSaving(false);
-      // Atualiza Histórico, ficha da cliente, Acerto e a própria agenda.
       qc.invalidateQueries({ queryKey: ["atendimentos"] });
+      return;
     }
+
+    if (agendarRetorno) {
+      const datas = gerarDatas(inicio, intervalo, vezes).filter((d) => !puladas.has(d));
+      try {
+        const ids = await criarAgendamentosRecorrentes({
+          clienteId: atendimento.cliente_id, datas, hora: horaRetorno, duracao, observacoes: "", itens: v.itens, intervaloDias: intervalo,
+        });
+        toast.success(
+          ids.length === 1
+            ? `Retorno agendado para ${datas[0]!.slice(8, 10)}/${datas[0]!.slice(5, 7)} às ${horaRetorno}`
+            : `${plural(ids.length, "retorno agendado", "retornos agendados")} · a cada ${intervalo} dias`,
+        );
+        qc.invalidateQueries({ queryKey: ["clientes"] });
+      } catch (err) {
+        console.error(err);
+        toast.error("Atendimento concluído, mas o retorno não foi agendado.");
+      }
+    }
+    setSaving(false);
+    onClose();
+    // Atualiza Histórico, ficha da cliente, Acerto e a própria agenda.
+    qc.invalidateQueries({ queryKey: ["atendimentos"] });
   }
 
   return (
@@ -431,7 +583,51 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
         <form onSubmit={salvar} className="space-y-5 overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
           <ServicosPicker itens={itens} onChange={setItens} />
           <PagamentosPicker total={total} partes={partes} onChange={setPartes} taxas={taxas} />
-          <Button type="submit" size="xl" disabled={saving}>{saving ? "Salvando..." : "Concluir"}</Button>
+
+          {jaTem ? (
+            <p className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-2.5 text-sm text-secondary-foreground">
+              <CalendarDays className="size-4 shrink-0 text-primary" aria-hidden />
+              Já tem próximo agendamento em {dataBR(jaTem.data).slice(0, 5)}{jaTem.hora ? ` às ${horaHM(jaTem.hora)}` : ""}.
+            </p>
+          ) : oferecerRetorno ? (
+            <section className="space-y-4 rounded-2xl border bg-card p-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="agendar-retorno" className="flex items-center gap-2 font-semibold">
+                  <CalendarPlus className="size-5 text-primary" aria-hidden /> Agendar retorno
+                </label>
+                <Switch id="agendar-retorno" checked={retorno} onCheckedChange={setRetorno} />
+              </div>
+              {retorno && (
+                <>
+                  <p className="-mt-2 text-xs text-muted-foreground">
+                    {cliente?.retorno_dias ? "Intervalo da ficha da cliente." : "O intervalo fica salvo na ficha da cliente."} Mesmos serviços ({duracao} min).
+                  </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="hora-retorno">Hora do retorno</Label>
+                    <Input id="hora-retorno" className="h-12 text-base" type="time" step={60} value={horaRetorno} onChange={(e) => setHoraRetorno(e.target.value)} />
+                  </div>
+                  <RecorrenciaPicker
+                    inicio={inicio}
+                    onInicio={setInicio}
+                    hora={horaRetorno}
+                    duracao={duracao}
+                    intervalo={intervalo}
+                    onIntervalo={setIntervalo}
+                    vezes={vezes}
+                    onVezes={setVezes}
+                    puladas={puladas}
+                    onPuladas={setPuladas}
+                    hoje={hoje}
+                    textoVezes="1 = só o próximo"
+                  />
+                </>
+              )}
+            </section>
+          ) : null}
+
+          <Button type="submit" size="xl" disabled={saving}>
+            {saving ? "Salvando..." : agendarRetorno ? "Concluir e agendar retorno" : "Concluir"}
+          </Button>
         </form>
       </DrawerContent>
     </Drawer>

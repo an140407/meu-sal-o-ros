@@ -12,7 +12,8 @@ import type { Cliente } from "@/lib/data";
 export const CONSENT_TEXT =
   "A cliente autoriza o armazenamento dos dados de saúde para fins de atendimento";
 
-export type ClienteInput = Omit<Cliente, "id" | "user_id" | "created_at">;
+/** Campos da ficha. O intervalo de retorno é editado à parte (cabeçalho da ficha), por isso fica fora. */
+export type ClienteInput = Omit<Cliente, "id" | "user_id" | "created_at" | "retorno_dias">;
 
 const schema = z.object({
   nome: z.string().trim().min(1, "Informe o nome").max(120),

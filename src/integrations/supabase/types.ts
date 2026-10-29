@@ -117,6 +117,7 @@ export type Database = {
           id: string
           observacoes: string | null
           percentual_ana: number
+          serie_id: string | null
           servico_id: string | null
           status: string
           taxa_percentual: number
@@ -134,6 +135,7 @@ export type Database = {
           id?: string
           observacoes?: string | null
           percentual_ana?: number
+          serie_id?: string | null
           servico_id?: string | null
           status?: string
           taxa_percentual?: number
@@ -151,6 +153,7 @@ export type Database = {
           id?: string
           observacoes?: string | null
           percentual_ana?: number
+          serie_id?: string | null
           servico_id?: string | null
           status?: string
           taxa_percentual?: number
@@ -189,6 +192,7 @@ export type Database = {
           nome: string
           observacoes: string | null
           problema_unhas: string | null
+          retorno_dias: number | null
           telefone: string | null
           user_id: string
         }
@@ -205,6 +209,7 @@ export type Database = {
           nome: string
           observacoes?: string | null
           problema_unhas?: string | null
+          retorno_dias?: number | null
           telefone?: string | null
           user_id?: string
         }
@@ -221,6 +226,7 @@ export type Database = {
           nome?: string
           observacoes?: string | null
           problema_unhas?: string | null
+          retorno_dias?: number | null
           telefone?: string | null
           user_id?: string
         }
@@ -348,6 +354,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aplicar_aos_proximos_da_serie: {
+        Args: { p_atendimento_id: string }
+        Returns: number
+      }
+      criar_agendamentos_recorrentes: {
+        Args: {
+          p_cliente_id: string
+          p_datas: string[]
+          p_duracao_min: number
+          p_hora: string
+          p_intervalo_dias: number
+          p_itens: Json
+          p_observacoes: string
+        }
+        Returns: string[]
+      }
       garantir_setup: { Args: never; Returns: undefined }
       salvar_itens_e_pagamentos: {
         Args: { p_atendimento_id: string; p_itens: Json; p_pagamentos: Json }

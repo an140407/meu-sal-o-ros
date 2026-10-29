@@ -50,4 +50,14 @@ describe("clientesParaRetorno", () => {
     expect(clientesParaRetorno(clientes, realizados, new Set(), "2026-10-01", 21).map((x) => x.cliente.id)).toEqual(["b"]);
     expect(clientesParaRetorno(clientes, realizados, new Set(), "2026-10-02", 21).map((x) => x.cliente.id)).toEqual(["b", "a"]);
   });
+
+  it("usa o intervalo de cada cliente; sem intervalo, o padrão", () => {
+    const comPrazo = [{ id: "a", retorno_dias: 14 }, { id: "b", retorno_dias: null }, { id: "c", retorno_dias: 3 }];
+    const r = clientesParaRetorno(comPrazo, realizados, new Set(), "2026-10-04", 30);
+    expect(r.map((x) => [x.cliente.id, x.prazo, x.prazoDaCliente, x.atraso])).toEqual([
+      ["b", 30, false, 34],
+      ["a", 14, true, 10],
+      ["c", 3, true, 1],
+    ]);
+  });
 });

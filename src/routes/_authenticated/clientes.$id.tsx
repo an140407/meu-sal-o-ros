@@ -2,9 +2,10 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, CalendarPlus, MessageCircle, Phone, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarPlus, MessageCircle, Phone, Plus, Repeat, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -14,7 +15,8 @@ import { Empty } from "@/components/app/ui-bits";
 import { ClienteForm } from "@/components/app/ClienteForm";
 import { AtendimentoList } from "@/components/app/AtendimentoList";
 import { AtendimentoForm } from "@/components/app/AtendimentoForm";
-import { useAtendimentos, useClientes, useProximosDaCliente, type Atendimento } from "@/lib/data";
+import { useAtendimentos, useClientes, useMembrosSeries, useProximosDaCliente, type Atendimento, type Cliente } from "@/lib/data";
+import { intervaloValido, posicaoNaSerie } from "@/lib/recorrencia";
 import { brl, dataBR, diaPorExtenso, hojeISO, horaDeMinutos, horaHM, minutos } from "@/lib/format";
 import { linkWhatsappTexto, normalizarTelefone } from "@/lib/links";
 import { nomesItens } from "@/lib/itens";
@@ -42,6 +44,7 @@ function Page() {
   const [editing, setEditing] = useState<Atendimento | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
   const c = clientes?.find((x) => x.id === id);
+  const { data: series } = useMembrosSeries(proximos.flatMap((a) => (a.serie_id ? [a.serie_id] : [])));
 
   if (isLoading) return <Empty>Carregando...</Empty>;
   if (!c) return <Empty>Cliente não encontrada.</Empty>;
@@ -49,7 +52,7 @@ function Page() {
   const total = hist.reduce((s, a) => s + Number(a.valor_bruto), 0);
   const tel = normalizarTelefone(c.telefone);
   const whatsapp = linkWhatsappTexto(c.telefone);
-  const { id: _i, user_id: _u, created_at: _c, ...initial } = c;
+  const { id: _i, user_id: _u, created_at: _c, retorno_dias: _r, ...initial } = c;
 
   async function excluir() {
     const { error } = await supabase.from("clientes").delete().eq("id", id);
@@ -96,6 +99,7 @@ function Page() {
             <CalendarPlus /> Agendar
           </Button>
         </div>
+        <RetornoDaCliente cliente={c} />
       </header>
       <Tabs defaultValue="historico" className="px-5 pt-4">
         <TabsList className="grid h-12 w-full grid-cols-2 rounded-2xl">
@@ -124,7 +128,17 @@ function Page() {
                           {nomesItens(a.itens)}
                         </div>
                       </div>
-                      <div className="shrink-0 font-semibold">{brl(a.valor_bruto)}</div>
+                      <div className="shrink-0 text-right">
+                        <div className="font-semibold tabular-nums">{brl(a.valor_bruto)}</div>
+                        {(() => {
+                          const pos = a.serie_id ? posicaoNaSerie(a.id, series?.get(a.serie_id) ?? []) : null;
+                          return pos ? (
+                            <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-primary tabular-nums">
+                              <Repeat className="size-3" aria-hidden /><span className="sr-only">Série, </span>{pos.n} de {pos.m}
+                            </span>
+                          ) : null;
+                        })()}
+                      </div>
                     </Link>
                   </li>
                 ))}
@@ -166,5 +180,62 @@ function Page() {
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+/** "Retorno a cada X dias" com edição rápida (1–365 ou sem intervalo). */
+function RetornoDaCliente({ cliente }: { cliente: Cliente }) {
+  const qc = useQueryClient();
+  const [editando, setEditando] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  async function salvar(valor: number | null) {
+    setSalvando(true);
+    const { error } = await supabase.from("clientes").update({ retorno_dias: valor }).eq("id", cliente.id);
+    setSalvando(false);
+    if (error) return void toast.error("Não foi possível salvar.");
+    await qc.invalidateQueries({ queryKey: ["clientes"] });
+    toast.success(valor ? `Retorno a cada ${valor} dias` : "Sem intervalo de retorno");
+    setEditando(false);
+  }
+
+  if (!editando) {
+    return (
+      <div className="mt-3 flex min-h-12 items-center gap-2 rounded-xl bg-card/70 pl-3 text-[15px]">
+        <Repeat className="size-4 shrink-0 text-primary" aria-hidden />
+        <span className="flex-1">
+          {cliente.retorno_dias ? <>Retorno a cada <b className="tabular-nums">{cliente.retorno_dias} dias</b></> : <span className="text-muted-foreground">Sem intervalo de retorno</span>}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-11 px-3 font-semibold text-primary"
+          onClick={() => { setTexto(String(cliente.retorno_dias ?? "")); setEditando(true); }}
+        >
+          {cliente.retorno_dias ? "Alterar" : "Definir"}
+        </Button>
+      </div>
+    );
+  }
+
+  const n = intervaloValido(Number(texto));
+  return (
+    <form
+      className="mt-3 space-y-2 rounded-xl bg-card/80 p-3"
+      onSubmit={(e) => { e.preventDefault(); if (n) void salvar(n); else toast.error("Use de 1 a 365 dias."); }}
+    >
+      <label htmlFor="retorno-dias" className="text-sm font-medium">Retorno a cada (dias)</label>
+      <div className="flex gap-2">
+        <Input id="retorno-dias" autoFocus className="h-12 w-24 text-base tabular-nums" inputMode="numeric" value={texto} onChange={(e) => setTexto(e.target.value)} />
+        <Button type="submit" className="h-12 flex-1 rounded-xl" disabled={salvando}>Salvar</Button>
+        <Button type="button" variant="ghost" className="h-12 rounded-xl" onClick={() => setEditando(false)}>Voltar</Button>
+      </div>
+      {cliente.retorno_dias && (
+        <Button type="button" variant="ghost" className="h-11 w-full text-muted-foreground" disabled={salvando} onClick={() => void salvar(null)}>
+          Tirar o intervalo
+        </Button>
+      )}
+    </form>
   );
 }
