@@ -2,8 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { itensDoAtendimento, limitarDuracao, somaItens, type ItemServico } from "./itens";
+import { pagamentosDoAtendimento, type Pagamento } from "./pagamentos";
+import type { Forma } from "./format";
 
-// Colunas da agenda (drizzle/manual/0003) declaradas aqui até o types.ts ser regenerado.
 export type Status = "agendado" | "realizado" | "cancelado" | "faltou";
 export const STATUS_ATIVOS: Status[] = ["agendado", "realizado"];
 
@@ -11,23 +12,31 @@ export type Cliente = Tables<"clientes">;
 export type Servico = Tables<"servicos"> & { duracao_min: number };
 export type Config = Tables<"configuracoes"> & { hora_inicio: string | null; hora_fim: string | null };
 type ItemRow = ItemServico & { ordem: number };
+type PagamentoRow = { forma: string; valor: number; taxa_percentual: number; ordem: number };
 export type Atendimento = Tables<"atendimentos"> & {
   status: Status;
   duracao_min: number;
   clientes: { nome: string } | null;
   servicos: { nome: string } | null;
   atendimento_servicos: ItemRow[];
+  atendimento_pagamentos: PagamentoRow[];
   /** Itens em ordem (atendimento antigo sem itens = 1 item com servicos(nome) e valor_bruto). */
   itens: ItemServico[];
+  /** Partes do pagamento em ordem (concluído antigo sem partes = 1 parte com forma_pagamento e valor_bruto). */
+  pagamentos: Pagamento[];
 };
 
-/** Colunas lidas em toda consulta de atendimentos (inclui os serviços do atendimento). */
+/** Colunas lidas em toda consulta de atendimentos (inclui serviços e partes do pagamento). */
 const SELECT_ATENDIMENTO =
-  "*, clientes(nome), servicos(nome), atendimento_servicos(nome, valor, duracao_min, servico_id, ordem)";
+  "*, clientes(nome), servicos(nome), atendimento_servicos(nome, valor, duracao_min, servico_id, ordem), atendimento_pagamentos(forma, valor, taxa_percentual, ordem)";
 const ORDEM_ITENS = { referencedTable: "atendimento_servicos" } as const;
 
 const comItens = (rows: unknown): Atendimento[] =>
-  (rows as Omit<Atendimento, "itens">[]).map((a) => ({ ...a, itens: itensDoAtendimento(a) }));
+  (rows as Omit<Atendimento, "itens" | "pagamentos">[]).map((a) => ({
+    ...a,
+    itens: itensDoAtendimento(a),
+    pagamentos: pagamentosDoAtendimento(a),
+  }));
 
 let setupFeito = false;
 async function garantirSetup() {
@@ -228,14 +237,16 @@ export const useRepasses = (mes: string) =>
   });
 
 /**
- * Grava o atendimento e seus serviços. Nunca grava valor_bruto: o banco soma os itens.
+ * Grava o atendimento, seus serviços e (se vierem) as partes do pagamento. Nunca grava
+ * valor_bruto nem valor_liquido: o banco soma os itens e desconta a taxa de cada parte.
  * servico_id = serviço do 1º item (compatibilidade); duracao_min = soma, limitada a 15–480.
- * Ordem: atendimento → troca os itens numa transação (rpc substituir_itens_atendimento) → relê.
+ * Ordem: atendimento → troca itens (e partes) numa transação → relê.
  */
 export async function salvarAtendimentoComItens(
   id: string | null,
   campos: Omit<TablesUpdate<"atendimentos">, "valor_bruto" | "valor_liquido" | "servico_id" | "duracao_min">,
   itens: ItemServico[],
+  pagamentos?: { forma: Forma; valor: number }[],
 ): Promise<{ atendimento: Atendimento; duracaoAjustada: boolean }> {
   if (itens.length === 0) throw new Error("Atendimento sem serviços.");
   const { duracao, ajustada } = limitarDuracao(somaItens(itens).duracao);
@@ -255,11 +266,15 @@ export async function salvarAtendimentoComItens(
     atendimentoId = criado.id;
   }
 
-  // Apaga os itens antigos e insere os novos numa única transação; a ordem é a posição na lista.
-  const { error: eItens } = await supabase.rpc("substituir_itens_atendimento", {
-    p_atendimento_id: atendimentoId!,
-    p_itens: itens.map((i) => ({ servico_id: i.servico_id, nome: i.nome, valor: i.valor, duracao_min: i.duracao_min })),
-  });
+  // Troca itens (e partes do pagamento) numa única transação; a ordem é a posição na lista.
+  const pItens = itens.map((i) => ({ servico_id: i.servico_id, nome: i.nome, valor: i.valor, duracao_min: i.duracao_min }));
+  const { error: eItens } = pagamentos
+    ? await supabase.rpc("salvar_itens_e_pagamentos", {
+        p_atendimento_id: atendimentoId!,
+        p_itens: pItens,
+        p_pagamentos: pagamentos.map((p) => ({ forma: p.forma, valor: p.valor })),
+      })
+    : await supabase.rpc("substituir_itens_atendimento", { p_atendimento_id: atendimentoId!, p_itens: pItens });
   if (eItens) {
     // Atendimento novo sem itens ficaria órfão (valor 0): desfaz o que acabou de ser criado.
     if (!id) await supabase.from("atendimentos").delete().eq("id", atendimentoId!);

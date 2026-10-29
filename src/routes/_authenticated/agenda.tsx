@@ -6,19 +6,21 @@ import { Ban, CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Mess
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { PageHeader, Empty } from "@/components/app/ui-bits";
 import { AgendaForm, AvisoSaude } from "@/components/app/AgendaForm";
 import { AtendimentoForm } from "@/components/app/AtendimentoForm";
 import { ServicosPicker } from "@/components/app/ServicosPicker";
+import { PagamentosPicker } from "@/components/app/PagamentosPicker";
 import {
   STATUS_ATIVOS, proximoMes, salvarAtendimentoComItens, useAgenda, useClientes, useConfig, type Atendimento, type Status,
 } from "@/lib/data";
-import { itensParaForm, nomesItens, validarItens, type ItemForm } from "@/lib/itens";
+import { itensParaForm, nomesItens, somaItens, totaisForm, validarItens, type ItemForm } from "@/lib/itens";
+import { formaPrincipal, partesIniciais, validarPagamentos, type ParteForm } from "@/lib/pagamentos";
+import { mensagemErro } from "@/lib/erros";
 import {
-  FORMAS, brl, diaDoMes, diaPorExtenso, diaSemanaCurto, hojeISO, horaDeMinutos, horaHM,
-  inicioSemana, mesAno, minutos, somarDias, type Forma,
+  brl, dataBR, diaDoMes, diaPorExtenso, diaSemanaCurto, hojeISO, horaDeMinutos, horaHM,
+  inicioSemana, mesAno, minutos, somarDias,
 } from "@/lib/format";
 import { gradeMes } from "@/lib/agenda";
 import { linkGoogleAgenda, linkWhatsapp } from "@/lib/links";
@@ -372,14 +374,19 @@ function Page() {
 
 function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | null; onClose: () => void }) {
   const qc = useQueryClient();
+  const { data: cfg } = useConfig();
   const [itens, setItens] = useState<ItemForm[]>([]);
-  const [forma, setForma] = useState<Forma | "">("");
+  const [partes, setPartes] = useState<ParteForm[]>([]);
   const [saving, setSaving] = useState(false);
+  const total = totaisForm(itens).valor;
+  const taxas = { debito: Number(cfg?.taxa_debito ?? 0), credito: Number(cfg?.taxa_credito ?? 0) };
 
   useEffect(() => {
     if (!atendimento) return;
     setItens(itensParaForm(atendimento.itens));
-    setForma("");
+    // Agendado ainda não tem partes de verdade (a forma é provisória): começa com Pix no total.
+    const gravadas = atendimento.atendimento_pagamentos.length > 0 ? atendimento.pagamentos : [];
+    setPartes(partesIniciais(gravadas, Number(atendimento.valor_bruto)));
   }, [atendimento]);
 
   async function salvar(e: React.FormEvent) {
@@ -387,24 +394,26 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
     if (!atendimento) return;
     const v = validarItens(itens);
     if ("erro" in v) return void toast.error(v.erro);
-    if (!forma) return void toast.error("Escolha a forma de pagamento.");
+    const pg = validarPagamentos(partes, somaItens(v.itens).valor);
+    if ("erro" in pg) return void toast.error(pg.erro);
     setSaving(true);
     try {
-      // O total vem da soma dos itens (calculada no banco).
+      // O total vem da soma dos itens; o líquido, das taxas de cada parte (calculados no banco).
       const { atendimento: lido, duracaoAjustada } = await salvarAtendimentoComItens(
         atendimento.id,
-        { status: "realizado", forma_pagamento: forma },
+        { status: "realizado", forma_pagamento: formaPrincipal(pg.pagamentos) },
         v.itens,
+        pg.pagamentos,
       );
       toast.success(`Atendimento concluído · ${brl(lido.valor_bruto)}`);
       if (duracaoAjustada) toast.warning(`A duração total foi limitada a ${lido.duracao_min} min.`);
       onClose();
     } catch (err) {
       console.error(err);
-      toast.error("Não foi possível concluir.");
+      toast.error(mensagemErro(err, "Não foi possível concluir."));
     } finally {
       setSaving(false);
-      // Atualiza Atendimentos, ficha da cliente, Acerto e a própria agenda.
+      // Atualiza Histórico, ficha da cliente, Acerto e a própria agenda.
       qc.invalidateQueries({ queryKey: ["atendimentos"] });
     }
   }
@@ -415,27 +424,13 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
         <DrawerHeader className="text-left">
           <DrawerTitle className="font-display text-2xl">Concluir atendimento</DrawerTitle>
           <DrawerDescription className="truncate">
-            {atendimento?.clientes?.nome ?? "—"} · {atendimento ? nomesItens(atendimento.itens) : ""}
+            {atendimento?.clientes?.nome ?? "—"}
+            {atendimento ? ` · ${dataBR(atendimento.data).slice(0, 5)}${atendimento.hora ? ` · ${horaHM(atendimento.hora)}` : ""}` : ""}
           </DrawerDescription>
         </DrawerHeader>
-        <form onSubmit={salvar} className="space-y-4 overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
+        <form onSubmit={salvar} className="space-y-5 overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
           <ServicosPicker itens={itens} onChange={setItens} />
-          <div className="space-y-2">
-            <Label>Forma de pagamento</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {FORMAS.map((f) => (
-                <Button
-                  key={f.value}
-                  type="button"
-                  variant={forma === f.value ? "default" : "outline"}
-                  className="h-12 rounded-xl text-base"
-                  onClick={() => setForma(f.value)}
-                >
-                  {f.label}
-                </Button>
-              ))}
-            </div>
-          </div>
+          <PagamentosPicker total={total} partes={partes} onChange={setPartes} taxas={taxas} />
           <Button type="submit" size="xl" disabled={saving}>{saving ? "Salvando..." : "Concluir"}</Button>
         </form>
       </DrawerContent>

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { BarChart3, ChevronDown, ChevronRight, Copy, Plus, Trash2 } from "lucide-react";
+import { Banknote, BarChart3, ChevronDown, ChevronRight, Copy, CreditCard, Plus, QrCode, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,8 +18,9 @@ import { useAtendimentos, useAtendimentosMes, useConfig, useDespesas, useRepasse
 import { saldoPorMes } from "@/lib/acerto";
 import { resumoDespesas } from "@/lib/despesas";
 import { nomesItens } from "@/lib/itens";
+import { partesTexto, totaisPorForma } from "@/lib/pagamentos";
 import { cn } from "@/lib/utils";
-import { brl, buscaMes, dataBR, dataHora, hojeISO, mesAno, parseValor } from "@/lib/format";
+import { brl, buscaMes, dataBR, dataHora, formaLabel, hojeISO, mesAno, parseValor, type Forma } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/acerto")({
   validateSearch: buscaMes,
@@ -35,6 +36,8 @@ export const Route = createFileRoute("/_authenticated/acerto")({
 });
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
+
+const ICONE_FORMA: Record<Forma, typeof QrCode> = { pix: QrCode, dinheiro: Banknote, debito: CreditCard, credito: CreditCard };
 
 function Page() {
   const navigate = Route.useNavigate();
@@ -58,12 +61,16 @@ function Page() {
   // Só informativo: despesas não entram no repasse, no saldo nem no resumo copiado.
   const totalDespesas = resumoDespesas(despesas).total;
   const lucroReal = r2(ana - totalDespesas);
+  const porForma = totaisPorForma(atends);
 
   async function copiar() {
     const linhas = [
       `Acerto ${mesAno(mes)}`,
       "",
-      ...atends.map((a) => `${dataHora(a.data, a.hora)} - ${a.clientes?.nome ?? "—"} - ${nomesItens(a.itens)} - ${brl(a.valor_bruto)}`),
+      ...atends.map((a) => {
+        const linhaBase = `${dataHora(a.data, a.hora)} - ${a.clientes?.nome ?? "—"} - ${nomesItens(a.itens)} - ${brl(a.valor_bruto)}`;
+        return a.pagamentos.length > 1 ? `${linhaBase} (${partesTexto(a.pagamentos)})` : linhaBase;
+      }),
       "",
       `Total bruto: ${brl(bruto)}`,
       `Taxas: ${brl(taxas)}`,
@@ -72,6 +79,9 @@ function Page() {
       `Parte da ${dona}: ${brl(parteDona)}`,
       `Repassado: ${brl(repassado)}`,
       `Saldo a receber: ${brl(saldo)}`,
+      ...(porForma.length > 0
+        ? ["", "Por forma de pagamento:", ...porForma.map((f) => `${formaLabel(f.forma)}: ${brl(f.valor)}${f.taxa > 0 ? ` (taxa ${brl(f.taxa)})` : ""}`)]
+        : []),
     ];
     try {
       await navigator.clipboard.writeText(linhas.join("\n"));
@@ -119,6 +129,26 @@ function Page() {
             </div>
           )}
         </section>
+
+        {porForma.length > 0 && (
+          <section className="rounded-2xl border bg-card p-4">
+            <h2 className="mb-1 text-xl">Por forma de pagamento</h2>
+            <ul className="divide-y">
+              {porForma.map((f) => {
+                const Icone = ICONE_FORMA[f.forma];
+                return (
+                  <li key={f.forma} className="flex items-center justify-between gap-3 py-2">
+                    <span className="flex items-center gap-2 text-muted-foreground"><Icone className="size-[18px]" aria-hidden /> {formaLabel(f.forma)}</span>
+                    <span className="text-right tabular-nums">
+                      <span className="font-semibold">{brl(f.valor)}</span>
+                      {f.taxa > 0 && <span className="ml-1.5 text-xs text-muted-foreground">− {brl(f.taxa)}</span>}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         <Button size="xl" variant="secondary" onClick={copiar}><Copy /> Copiar resumo</Button>
 

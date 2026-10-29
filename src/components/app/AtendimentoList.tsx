@@ -1,6 +1,7 @@
-import { brl, dataHora, formaLabel, mesAno } from "@/lib/format";
+import { brl, dataHora, mesAno } from "@/lib/format";
 import type { Atendimento } from "@/lib/data";
 import { nomesItens } from "@/lib/itens";
+import { formasLabel } from "@/lib/pagamentos";
 
 export function AtendimentoList({
   itens, onSelect, mostrarCliente = true, nomeDona,
@@ -45,7 +46,7 @@ export function AtendimentoList({
                         {mostrarCliente ? a.clientes?.nome ?? "—" : nomesItens(a.itens)}
                       </div>
                       <div className="truncate text-sm text-muted-foreground">
-                        {dataHora(a.data, a.hora)} · {mostrarCliente ? `${nomesItens(a.itens)} · ` : ""}{formaLabel(a.forma_pagamento)}
+                        {dataHora(a.data, a.hora)} · {mostrarCliente ? `${nomesItens(a.itens)} · ` : ""}{formasLabel(a.pagamentos)}
                       </div>
                     </div>
                     <div className="shrink-0 text-right">

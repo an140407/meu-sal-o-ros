@@ -15,9 +15,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "./ui-bits";
 import { ClienteForm, emptyCliente } from "./ClienteForm";
 import { ServicosPicker } from "./ServicosPicker";
-import { salvarAtendimentoComItens, useClientes, type Atendimento } from "@/lib/data";
-import { FORMAS, brl, hojeISO, horaAgora, horaHM, type Forma } from "@/lib/format";
-import { itensParaForm, validarItens, type ItemForm } from "@/lib/itens";
+import { PagamentosPicker } from "./PagamentosPicker";
+import { salvarAtendimentoComItens, useClientes, useConfig, type Atendimento } from "@/lib/data";
+import { brl, hojeISO, horaAgora, horaHM } from "@/lib/format";
+import { itensParaForm, somaItens, totaisForm, validarItens, type ItemForm } from "@/lib/itens";
+import { formaPrincipal, partesIniciais, validarPagamentos, type ParteForm } from "@/lib/pagamentos";
+import { mensagemErro } from "@/lib/erros";
 
 export function AtendimentoForm({
   open, onOpenChange, editing, clienteFixo,
@@ -29,11 +32,12 @@ export function AtendimentoForm({
 }) {
   const qc = useQueryClient();
   const { data: clientes = [] } = useClientes();
+  const { data: cfg } = useConfig();
   const [clienteId, setClienteId] = useState("");
   const [itens, setItens] = useState<ItemForm[]>([]);
   const [data, setData] = useState(hojeISO());
   const [hora, setHora] = useState("");
-  const [forma, setForma] = useState<Forma>("pix");
+  const [partes, setPartes] = useState<ParteForm[]>([]);
   const [obs, setObs] = useState("");
   const [novoCliente, setNovoCliente] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -47,17 +51,20 @@ export function AtendimentoForm({
       setItens(itensParaForm(editing.itens));
       setData(editing.data);
       setHora(horaHM(editing.hora));
-      setForma(editing.forma_pagamento as Forma);
+      setPartes(partesIniciais(editing.pagamentos, Number(editing.valor_bruto)));
       setObs(editing.observacoes ?? "");
     } else {
       setClienteId(clienteFixo ?? "");
       setItens([]);
       setData(hojeISO());
       setHora(horaAgora());
-      setForma("pix");
+      setPartes(partesIniciais([], 0));
       setObs("");
     }
   }, [open, editing, clienteFixo]);
+
+  const total = totaisForm(itens).valor;
+  const taxas = { debito: Number(cfg?.taxa_debito ?? 0), credito: Number(cfg?.taxa_credito ?? 0) };
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["atendimentos"] });
@@ -68,20 +75,25 @@ export function AtendimentoForm({
     if (!clienteId) return void toast.error("Escolha a cliente.");
     const v = validarItens(itens);
     if ("erro" in v) return void toast.error(v.erro);
+    const pg = validarPagamentos(partes, somaItens(v.itens).valor);
+    if ("erro" in pg) return void toast.error(pg.erro);
     setSaving(true);
-    const campos = { cliente_id: clienteId, data, hora: hora || null, forma_pagamento: forma, observacoes: obs.trim() || null };
+    const campos = {
+      cliente_id: clienteId, data, hora: hora || null, forma_pagamento: formaPrincipal(pg.pagamentos), observacoes: obs.trim() || null,
+    };
     try {
       const { atendimento, duracaoAjustada } = await salvarAtendimentoComItens(
         editing?.id ?? null,
         editing ? campos : { ...campos, status: "realizado" },
         v.itens,
+        pg.pagamentos,
       );
       toast.success(`${editing ? "Atendimento atualizado" : "Atendimento registrado"} · ${brl(atendimento.valor_bruto)}`);
       if (duracaoAjustada) toast.warning(`A duração total foi limitada a ${atendimento.duracao_min} min.`);
       onOpenChange(false);
     } catch (err) {
       console.error(err);
-      toast.error("Não foi possível salvar.");
+      toast.error(mensagemErro(err, "Não foi possível salvar."));
     } finally {
       setSaving(false);
       refresh();
@@ -152,22 +164,7 @@ export function AtendimentoForm({
                     <Input className="h-12 text-base" type="time" step={60} value={hora} onChange={(e) => setHora(e.target.value)} />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Forma de pagamento</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {FORMAS.map((f) => (
-                      <Button
-                        key={f.value}
-                        type="button"
-                        variant={forma === f.value ? "default" : "outline"}
-                        className="h-12 rounded-xl text-base"
-                        onClick={() => setForma(f.value)}
-                      >
-                        {f.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
+                <PagamentosPicker total={total} partes={partes} onChange={setPartes} taxas={taxas} />
                 <div className="space-y-2">
                   <Label>Observações</Label>
                   <Textarea value={obs} onChange={(e) => setObs(e.target.value)} maxLength={1000} className="text-base" />

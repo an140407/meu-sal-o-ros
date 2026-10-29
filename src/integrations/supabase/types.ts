@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      atendimento_pagamentos: {
+        Row: {
+          atendimento_id: string
+          created_at: string
+          forma: string
+          id: string
+          ordem: number
+          taxa_percentual: number
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          atendimento_id: string
+          created_at?: string
+          forma: string
+          id?: string
+          ordem?: number
+          taxa_percentual: number
+          user_id?: string
+          valor: number
+        }
+        Update: {
+          atendimento_id?: string
+          created_at?: string
+          forma?: string
+          id?: string
+          ordem?: number
+          taxa_percentual?: number
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atendimento_pagamentos_atendimento_id_fkey"
+            columns: ["atendimento_id"]
+            isOneToOne: false
+            referencedRelation: "atendimentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atendimento_servicos: {
         Row: {
           atendimento_id: string
@@ -308,8 +349,16 @@ export type Database = {
     }
     Functions: {
       garantir_setup: { Args: never; Returns: undefined }
+      salvar_itens_e_pagamentos: {
+        Args: { p_atendimento_id: string; p_itens: Json; p_pagamentos: Json }
+        Returns: undefined
+      }
       substituir_itens_atendimento: {
         Args: { p_atendimento_id: string; p_itens: Json }
+        Returns: undefined
+      }
+      substituir_pagamentos_atendimento: {
+        Args: { p_atendimento_id: string; p_pagamentos: Json }
         Returns: undefined
       }
     }
