@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, CalendarPlus, MessageCircle, Phone, Plus, Repeat, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CalendarPlus, MessageCircle, Phone, Plus, Repeat, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,10 +15,14 @@ import { Empty } from "@/components/app/ui-bits";
 import { ClienteForm } from "@/components/app/ClienteForm";
 import { AtendimentoList } from "@/components/app/AtendimentoList";
 import { AtendimentoForm } from "@/components/app/AtendimentoForm";
-import { useAtendimentos, useClientes, useMembrosSeries, useProximosDaCliente, type Atendimento, type Cliente } from "@/lib/data";
-import { intervaloValido, posicaoNaSerie } from "@/lib/recorrencia";
+import {
+  alterarRetornoCliente, excluirCliente, useAtendimentos, useClientes, useMembrosSeries, useOcupadosNasDatas,
+  useProximosDaCliente, type Atendimento, type Cliente,
+} from "@/lib/data";
+import { conflitosDasDatas, intervaloValido, planoReorganizacao, posicaoNaSerie, type Mudanca } from "@/lib/recorrencia";
+import { mensagemErro } from "@/lib/erros";
 import { plural } from "@/lib/texto";
-import { brl, dataBR, diaPorExtenso, hojeISO, horaDeMinutos, horaHM, minutos } from "@/lib/format";
+import { brl, dataBR, diaPorExtenso, diaSemanaCurto, hojeISO, horaDeMinutos, horaHM, minutos } from "@/lib/format";
 import { formatarTelefone, linkWhatsappTexto, normalizarTelefone } from "@/lib/links";
 import { nomesItens } from "@/lib/itens";
 
@@ -38,12 +42,14 @@ function Page() {
   const { id } = Route.useParams();
   const { data: clientes, isLoading } = useClientes();
   const { data: hist = [] } = useAtendimentos(id);
-  const { data: proximos = [] } = useProximosDaCliente(id, hojeISO());
+  const hoje = hojeISO();
+  const { data: proximos = [] } = useProximosDaCliente(id, hoje);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Atendimento | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
   const c = clientes?.find((x) => x.id === id);
   const { data: series } = useMembrosSeries(proximos.flatMap((a) => (a.serie_id ? [a.serie_id] : [])));
 
@@ -55,26 +61,42 @@ function Page() {
   const whatsapp = linkWhatsappTexto(c.telefone);
   const { id: _i, user_id: _u, created_at: _c, retorno_dias: _r, ...initial } = c;
 
+  // Apaga a ficha e tudo o que é dela (função excluir_cliente, SQL 0007).
   async function excluir() {
-    const { error } = await supabase.from("clientes").delete().eq("id", id);
-    if (error) {
-      setConfirmDel(false);
-      return void toast.error(
-        error.code === "23503"
-          ? "Esta cliente tem atendimentos e não pode ser excluída."
-          : "Não foi possível excluir.",
-      );
+    setExcluindo(true);
+    try {
+      await excluirCliente(id);
+    } catch (err) {
+      setExcluindo(false);
+      return void toast.error(mensagemErro(err, "Não foi possível excluir a ficha."));
     }
-    await qc.invalidateQueries();
-    toast.success("Cliente excluída");
-    navigate({ to: "/clientes" });
+    toast.success(`Ficha de ${c!.nome} excluída`);
+    await navigate({ to: "/clientes" });
+    void qc.invalidateQueries();
   }
 
   return (
     <>
       <header className="bg-rose-gradient px-5 pb-5 pt-5">
-        <Link to="/clientes" className="inline-flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft className="size-4" /> Clientes</Link>
-        <h1 className="mt-2 text-3xl">{c.nome}</h1>
+        <div className="flex items-center justify-between">
+          <Link
+            to="/clientes"
+            className="-ml-2 inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ArrowLeft className="size-4" aria-hidden /> Clientes
+          </Link>
+          <Button
+            type="button"
+            variant="ghost"
+            className="-mr-2 size-11 px-0 text-muted-foreground"
+            aria-label="Excluir ficha"
+            title="Excluir ficha"
+            onClick={() => setConfirmDel(true)}
+          >
+            <Trash2 className="size-5" aria-hidden />
+          </Button>
+        </div>
+        <h1 className="mt-1 text-3xl">{c.nome}</h1>
         <p className="text-sm text-muted-foreground">
           {plural(hist.length, "atendimento", "atendimentos")} · {brl(total)}
           {c.consentimento_data && ` · consentimento em ${dataBR(c.consentimento_data)}`}
@@ -100,7 +122,7 @@ function Page() {
             <CalendarPlus /> Agendar
           </Button>
         </div>
-        <RetornoDaCliente cliente={c} />
+        <RetornoDaCliente cliente={c} proximos={proximos} hoje={hoje} />
       </header>
       <Tabs defaultValue="historico" className="px-5 pt-4">
         <TabsList className="grid h-14 w-full grid-cols-2 rounded-2xl p-1.5">
@@ -163,20 +185,47 @@ function Page() {
             }}
           />
           <Button variant="ghost" className="h-12 w-full text-destructive" onClick={() => setConfirmDel(true)}>
-            <Trash2 /> Excluir cliente
+            <Trash2 aria-hidden /> Excluir ficha
           </Button>
         </TabsContent>
       </Tabs>
       <AtendimentoForm open={open} onOpenChange={setOpen} editing={editing} clienteFixo={id} />
-      <AlertDialog open={confirmDel} onOpenChange={setConfirmDel}>
+      <AlertDialog open={confirmDel} onOpenChange={(o) => !excluindo && setConfirmDel(o)}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir {c.nome}?</AlertDialogTitle>
-            <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
+          <AlertDialogHeader className="text-left">
+            <AlertDialogTitle>Excluir a ficha de {c.nome}?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-left">
+                <p>Apaga para sempre a ficha (contato e anamnese) e tudo o que está na agenda dela:</p>
+                {proximos.length === 0 && hist.length === 0 ? (
+                  <p>Ela não tem atendimentos nem agendamentos futuros.</p>
+                ) : (
+                  <ul className="list-disc space-y-1 pl-5">
+                    {proximos.length > 0 && <li>{plural(proximos.length, "agendamento futuro", "agendamentos futuros")}</li>}
+                    {hist.length > 0 && (
+                      <li>
+                        <b className="text-foreground">
+                          {plural(hist.length, "atendimento realizado", "atendimentos realizados")} ({brl(total)})
+                        </b>
+                        : saem do Acerto e das Estatísticas dos meses em que aconteceram
+                      </li>
+                    )}
+                    <li>faltas e cancelamentos registrados</li>
+                  </ul>
+                )}
+                <p className="font-medium text-foreground">Não dá para desfazer.</p>
+              </div>
+            </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={excluir}>Excluir</AlertDialogAction>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="mt-0 h-11" disabled={excluindo}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="h-11 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={excluindo}
+              onClick={(e) => { e.preventDefault(); void excluir(); }}
+            >
+              {excluindo ? "Excluindo…" : "Excluir ficha"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -184,21 +233,50 @@ function Page() {
   );
 }
 
-/** "Retorno a cada X dias" com edição rápida (1–365 ou sem intervalo). */
-function RetornoDaCliente({ cliente }: { cliente: Cliente }) {
+/**
+ * "Retorno a cada X dias" com edição rápida (1–365 ou sem intervalo). Se a cliente tem séries
+ * agendadas, mudar o intervalo mostra as novas datas e oferece reorganizar os próximos.
+ */
+function RetornoDaCliente({ cliente, proximos, hoje }: { cliente: Cliente; proximos: Atendimento[]; hoje: string }) {
   const qc = useQueryClient();
   const [editando, setEditando] = useState(false);
   const [texto, setTexto] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [plano, setPlano] = useState<{ dias: number; mudancas: Mudanca<Atendimento>[] } | null>(null);
+  const temSerie = proximos.some((a) => a.serie_id);
 
-  async function salvar(valor: number | null) {
+  const fechar = () => { setPlano(null); setEditando(false); };
+
+  // Só o intervalo (sem mexer na agenda): "Tirar o intervalo", "Só salvar o intervalo" ou sem série.
+  async function salvarIntervalo(valor: number | null) {
     setSalvando(true);
     const { error } = await supabase.from("clientes").update({ retorno_dias: valor }).eq("id", cliente.id);
     setSalvando(false);
-    if (error) return void toast.error("Não foi possível salvar.");
+    if (error) return void toast.error(mensagemErro(error, "Não foi possível salvar."));
     await qc.invalidateQueries({ queryKey: ["clientes"] });
     toast.success(valor ? `Retorno a cada ${valor} dias` : "Sem intervalo de retorno");
-    setEditando(false);
+    fechar();
+  }
+
+  async function reorganizar(dias: number) {
+    setSalvando(true);
+    try {
+      const n = await alterarRetornoCliente({ clienteId: cliente.id, dias, reorganizar: true, hoje });
+      await qc.invalidateQueries();
+      toast.success(`Retorno a cada ${dias} dias · ${plural(n, "agendamento reorganizado", "agendamentos reorganizados")}`);
+      fechar();
+    } catch (err) {
+      toast.error(mensagemErro(err, "Não foi possível reorganizar os agendamentos."));
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  function enviar(dias: number) {
+    const mudancas = planoReorganizacao(proximos, dias, hoje);
+    if (mudancas.length > 0) setPlano({ dias, mudancas });
+    else if (dias !== cliente.retorno_dias) void salvarIntervalo(dias);
+    else fechar();
   }
 
   if (!editando) {
@@ -222,21 +300,114 @@ function RetornoDaCliente({ cliente }: { cliente: Cliente }) {
 
   const n = intervaloValido(Number(texto));
   return (
-    <form
-      className="mt-3 space-y-2 rounded-xl bg-card/80 p-3"
-      onSubmit={(e) => { e.preventDefault(); if (n) void salvar(n); else toast.error("Use de 1 a 365 dias."); }}
-    >
-      <label htmlFor="retorno-dias" className="text-sm font-medium">Retorno a cada (dias)</label>
-      <div className="flex gap-2">
-        <Input id="retorno-dias" autoFocus className="h-12 w-24 text-base tabular-nums" inputMode="numeric" value={texto} onChange={(e) => setTexto(e.target.value)} />
-        <Button type="submit" className="h-12 flex-1 rounded-xl" disabled={salvando}>Salvar</Button>
-        <Button type="button" variant="ghost" className="h-12 rounded-xl" onClick={() => setEditando(false)}>Voltar</Button>
-      </div>
-      {cliente.retorno_dias && (
-        <Button type="button" variant="ghost" className="h-11 w-full text-muted-foreground" disabled={salvando} onClick={() => void salvar(null)}>
-          Tirar o intervalo
-        </Button>
+    <>
+      <form
+        className="mt-3 space-y-2 rounded-xl bg-card/80 p-3"
+        onSubmit={(e) => { e.preventDefault(); if (n) enviar(n); else toast.error("Use de 1 a 365 dias."); }}
+      >
+        <label htmlFor="retorno-dias" className="text-sm font-medium">Retorno a cada (dias)</label>
+        <div className="flex gap-2">
+          <Input
+            id="retorno-dias"
+            autoFocus
+            className="h-12 w-24 text-base tabular-nums"
+            inputMode="numeric"
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            aria-describedby={temSerie ? "retorno-dica" : undefined}
+          />
+          <Button type="submit" className="h-12 flex-1 rounded-xl" disabled={salvando}>Salvar</Button>
+          <Button type="button" variant="ghost" className="h-12 rounded-xl" onClick={fechar}>Voltar</Button>
+        </div>
+        {temSerie && (
+          <p id="retorno-dica" className="text-xs text-muted-foreground">
+            Ao salvar, você vê as novas datas e escolhe se reorganiza os próximos agendamentos.
+          </p>
+        )}
+        {cliente.retorno_dias && (
+          <Button type="button" variant="ghost" className="h-11 w-full text-muted-foreground" disabled={salvando} onClick={() => void salvarIntervalo(null)}>
+            Tirar o intervalo
+          </Button>
+        )}
+      </form>
+      {plano && (
+        <ReorganizarDialog
+          nome={cliente.nome}
+          dias={plano.dias}
+          mudancas={plano.mudancas}
+          salvando={salvando}
+          onReorganizar={() => void reorganizar(plano.dias)}
+          onSoSalvar={() => void salvarIntervalo(plano.dias)}
+          onCancelar={() => setPlano(null)}
+        />
       )}
-    </form>
+    </>
+  );
+}
+
+/** Confirmação com as datas de antes → depois e aviso de horário ocupado. */
+function ReorganizarDialog({
+  nome, dias, mudancas, salvando, onReorganizar, onSoSalvar, onCancelar,
+}: {
+  nome: string;
+  dias: number;
+  mudancas: Mudanca<Atendimento>[];
+  salvando: boolean;
+  onReorganizar: () => void;
+  onSoSalvar: () => void;
+  onCancelar: () => void;
+}) {
+  const { data: ocupados = [], isFetching } = useOcupadosNasDatas(mudancas.map((m) => m.para));
+  const ids = mudancas.map((m) => m.item.id);
+  const ocupado = (m: Mudanca<Atendimento>) =>
+    conflitosDasDatas([m.para], m.item.hora ?? "", m.item.duracao_min, ocupados, ids).get(m.para);
+  const conflitos = mudancas.filter((m) => ocupado(m)).length;
+  const primeiroNome = nome.split(" ")[0];
+
+  return (
+    <AlertDialog open onOpenChange={(o) => !o && !salvando && onCancelar()}>
+      <AlertDialogContent>
+        <AlertDialogHeader className="text-left">
+          <AlertDialogTitle>Reorganizar os próximos agendamentos?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Com retorno a cada {dias} dias, {plural(mudancas.length, "agendamento", "agendamentos")} de {primeiroNome} mudam
+            de data. O próximo de cada série continua no mesmo dia e horário.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <ul className="max-h-56 space-y-1.5 overflow-y-auto rounded-xl bg-muted p-3 text-sm tabular-nums" aria-label="Datas que mudam">
+          {mudancas.map((m) => {
+            const o = ocupado(m);
+            return (
+              <li key={m.item.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="whitespace-nowrap text-muted-foreground line-through"><span className="sr-only">de </span>{dataBR(m.de).slice(0, 5)}</span>
+                <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                <span className="whitespace-nowrap font-semibold"><span className="sr-only">para </span>{diaSemanaCurto(m.para)}, {dataBR(m.para).slice(0, 5)}</span>
+                {o && (
+                  <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-500">
+                    <AlertTriangle className="size-3" aria-hidden /> ocupado · {o.cliente.split(" ")[0]} {horaHM(o.hora ?? "")}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <p role="status" className={conflitos > 0 ? "text-sm text-amber-900" : "text-sm text-muted-foreground"}>
+          {isFetching
+            ? "Conferindo horários…"
+            : conflitos > 0
+              ? `${plural(conflitos, "data cai", "datas caem")} em horário já ocupado. Dá para reorganizar mesmo assim e ajustar depois na Agenda.`
+              : "Nenhum horário ocupado nas novas datas."}
+        </p>
+        <AlertDialogFooter className="gap-2">
+          <AlertDialogCancel className="mt-0 h-11" disabled={salvando}>Cancelar</AlertDialogCancel>
+          <Button type="button" variant="outline" className="h-11" disabled={salvando} onClick={onSoSalvar}>
+            Só salvar o intervalo
+          </Button>
+          <AlertDialogAction className="h-11" disabled={salvando} onClick={(e) => { e.preventDefault(); onReorganizar(); }}>
+            {salvando ? "Salvando…" : "Reorganizar"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

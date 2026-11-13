@@ -55,19 +55,31 @@ describe("horariosLivres", () => {
 });
 
 describe("gradeMes", () => {
-  it("inclui as semanas parciais (seg–dom)", () => {
+  it("inclui as semanas parciais (dom–sáb)", () => {
     const g = gradeMes("2026-10"); // 1/out/2026 é quinta; 31/out é sábado
-    expect(g[0]).toBe("2026-09-28");
-    expect(g[g.length - 1]).toBe("2026-11-01");
+    expect(g[0]).toBe("2026-09-27");
+    expect(g[g.length - 1]).toBe("2026-10-31");
     expect(g).toHaveLength(35);
   });
 
-  it("mês que começa na segunda e vira o ano", () => {
-    const g = gradeMes("2027-02"); // 1/fev/2027 é segunda; 28/fev é domingo
-    expect(g[0]).toBe("2027-02-01");
-    expect(g).toHaveLength(28);
+  it("mês que começa no domingo, mês de 6 semanas e virada de ano", () => {
+    const n = gradeMes("2026-11"); // 1/nov/2026 é domingo; 30/nov é segunda
+    expect(n[0]).toBe("2026-11-01");
+    expect(n[n.length - 1]).toBe("2026-12-05");
+    expect(n).toHaveLength(35);
+    const a = gradeMes("2026-08"); // 1/ago/2026 é sábado → 6 semanas
+    expect(a[0]).toBe("2026-07-26");
+    expect(a).toHaveLength(42);
     const d = gradeMes("2026-12");
-    expect(d[0]).toBe("2026-11-30");
-    expect(d[d.length - 1]).toBe("2027-01-03");
+    expect(d[0]).toBe("2026-11-29");
+    expect(d[d.length - 1]).toBe("2027-01-02");
+  });
+
+  it("toda semana da grade começa no domingo", () => {
+    for (const mes of ["2026-01", "2026-02", "2026-11", "2027-02"]) {
+      const g = gradeMes(mes);
+      expect(g.length % 7).toBe(0);
+      for (let i = 0; i < g.length; i += 7) expect(new Date(`${g[i]}T12:00:00Z`).getUTCDay()).toBe(0);
+    }
   });
 });

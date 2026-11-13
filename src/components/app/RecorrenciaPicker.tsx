@@ -10,7 +10,7 @@ import {
 import { plural } from "@/lib/texto";
 import { cn } from "@/lib/utils";
 
-const SEMANA = ["S", "T", "Q", "Q", "S", "S", "D"];
+const SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
 const proximoMesDe = (mes: string) => somarDias(`${mes}-28`, 7).slice(0, 7);
 const mesAnteriorDe = (mes: string) => somarDias(`${mes}-01`, -1).slice(0, 7);
 

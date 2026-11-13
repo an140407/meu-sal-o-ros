@@ -56,8 +56,8 @@ export const somarDias = (iso: string, n: number) => {
 /** Dias de calendário de `de` até `ate` (ambos "YYYY-MM-DD"). */
 export const diasDesde = (de: string, ate: string) =>
   Math.round((calendario(ate).getTime() - calendario(de).getTime()) / 86_400_000);
-/** Segunda-feira da semana de `iso`. */
-export const inicioSemana = (iso: string) => somarDias(iso, -((calendario(iso).getUTCDay() + 6) % 7));
+/** Domingo da semana de `iso` (semana de domingo a sábado, como no Google Agenda). */
+export const inicioSemana = (iso: string) => somarDias(iso, -calendario(iso).getUTCDay());
 
 const DIAS_CURTOS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];

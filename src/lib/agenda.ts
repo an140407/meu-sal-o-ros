@@ -2,7 +2,7 @@ import { horaDeMinutos, inicioSemana, minutos, somarDias } from "./format";
 
 const ATIVOS = ["agendado", "realizado"];
 
-/** Dias da grade do mês ("YYYY-MM"): de segunda antes do dia 1 até domingo depois do último dia. */
+/** Dias da grade do mês ("YYYY-MM"): do domingo antes do dia 1 até o sábado depois do último dia. */
 export function gradeMes(mes: string): string[] {
   const [y, m] = mes.split("-").map(Number) as [number, number];
   const proximo = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;

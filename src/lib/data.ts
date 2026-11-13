@@ -363,3 +363,25 @@ export async function aplicarAosProximosDaSerie(atendimentoId: string): Promise<
   if (error) throw error;
   return data ?? 0;
 }
+
+/** Apaga a ficha e tudo o que é da cliente (agendamentos, atendimentos, serviços e pagamentos). */
+export async function excluirCliente(clienteId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("excluir_cliente", { p_cliente_id: clienteId });
+  if (error) throw error;
+  return data ?? 0;
+}
+
+/**
+ * Grava o intervalo de retorno (1–365) e, com `reorganizar`, redistribui os próximos
+ * agendamentos das séries da cliente (ver `planoReorganizacao`). Retorna quantos mudaram de data.
+ */
+export async function alterarRetornoCliente(p: { clienteId: string; dias: number; reorganizar: boolean; hoje: string }): Promise<number> {
+  const { data, error } = await supabase.rpc("alterar_retorno_cliente", {
+    p_cliente_id: p.clienteId,
+    p_dias: p.dias,
+    p_reorganizar: p.reorganizar,
+    p_hoje: p.hoje,
+  });
+  if (error) throw error;
+  return data ?? 0;
+}

@@ -10,4 +10,7 @@ describe("mensagemErro", () => {
     expect(mensagemErro(new Error("Failed to fetch"), "Não foi possível salvar.")).toBe("Não foi possível salvar.");
     expect(mensagemErro(null, "Padrão")).toBe("Padrão");
   });
+  it("função que ainda não existe no banco avisa que falta o SQL", () => {
+    expect(mensagemErro({ code: "PGRST202", message: "Could not find the function" }, "Erro")).toMatch(/SQL/);
+  });
 });

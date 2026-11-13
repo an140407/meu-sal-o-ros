@@ -354,6 +354,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      alterar_retorno_cliente: {
+        Args: {
+          p_cliente_id: string
+          p_dias: number
+          p_hoje: string
+          p_reorganizar: boolean
+        }
+        Returns: number
+      }
       aplicar_aos_proximos_da_serie: {
         Args: { p_atendimento_id: string }
         Returns: number
@@ -370,6 +379,7 @@ export type Database = {
         }
         Returns: string[]
       }
+      excluir_cliente: { Args: { p_cliente_id: string }; Returns: number }
       garantir_setup: { Args: never; Returns: undefined }
       salvar_itens_e_pagamentos: {
         Args: { p_atendimento_id: string; p_itens: Json; p_pagamentos: Json }

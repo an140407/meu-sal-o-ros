@@ -90,3 +90,31 @@ export const proximosDaSerie = (data: string, membros: Membro[]) =>
 export function intervaloValido(n: number): number | null {
   return Number.isInteger(n) && n >= 1 && n <= 365 ? n : null;
 }
+
+export type Mudanca<T> = { item: T; de: string; para: string };
+
+/**
+ * O que acontece com os próximos da cliente ao mudar o intervalo de retorno — a mesma regra
+ * da função `alterar_retorno_cliente` do banco: em cada série, os ainda 'agendado' a partir de
+ * `hoje` são ordenados por data (e id); o primeiro fica, o k-ésimo seguinte vai para
+ * primeiro + k × intervalo. Devolve só os que mudam de data, em ordem de data nova.
+ */
+export function planoReorganizacao<T extends Membro>(itens: T[], intervalo: number, hoje: string): Mudanca<T>[] {
+  const passo = intervaloValido(intervalo);
+  if (!passo) return [];
+  const porSerie = new Map<string, T[]>();
+  for (const a of itens) {
+    if (!a.serie_id || a.status !== "agendado" || a.data < hoje) continue;
+    porSerie.set(a.serie_id, [...(porSerie.get(a.serie_id) ?? []), a]);
+  }
+  const out: Mudanca<T>[] = [];
+  for (const membros of porSerie.values()) {
+    const ordem = [...membros].sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const primeira = ordem[0]!.data;
+    ordem.forEach((item, k) => {
+      const para = somarDias(primeira, k * passo);
+      if (para !== item.data) out.push({ item, de: item.data, para });
+    });
+  }
+  return out.sort((a, b) => a.para.localeCompare(b.para));
+}

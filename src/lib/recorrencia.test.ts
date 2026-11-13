@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  conflitosDasDatas, gerarDatas, intervaloDaSerie, intervaloValido, posicaoNaSerie, proximosDaSerie, resumoSerie,
+  conflitosDasDatas, gerarDatas, intervaloDaSerie, intervaloValido, planoReorganizacao, posicaoNaSerie, proximosDaSerie, resumoSerie,
   type Membro, type Ocupado,
 } from "./recorrencia";
 
@@ -81,5 +81,39 @@ describe("séries", () => {
     expect(intervaloValido(0)).toBeNull();
     expect(intervaloValido(366)).toBeNull();
     expect(intervaloValido(2.5)).toBeNull();
+  });
+});
+
+describe("planoReorganizacao", () => {
+  // Mesmo cenário testado no banco (0007): série de 21 em 21 com uma passada e uma cancelada,
+  // e outra série de 7 em 7. Hoje = 13/11/2026, novo intervalo = 14.
+  const itens: Membro[] = [
+    { id: "p", data: "2026-11-04", status: "agendado", serie_id: "s1" },
+    { id: "a", data: "2026-11-25", status: "agendado", serie_id: "s1" },
+    { id: "c", data: "2026-12-16", status: "cancelado", serie_id: "s1" },
+    { id: "b", data: "2027-01-06", status: "agendado", serie_id: "s1" },
+    { id: "d", data: "2027-01-27", status: "agendado", serie_id: "s1" },
+    { id: "x", data: "2026-11-16", status: "agendado", serie_id: "s2" },
+    { id: "y", data: "2026-11-23", status: "agendado", serie_id: "s2" },
+    { id: "z", data: "2026-11-30", status: "agendado", serie_id: "s2" },
+    { id: "solto", data: "2026-12-01", status: "agendado", serie_id: null },
+  ];
+  it("mantém o primeiro de cada série e redistribui os seguintes (igual ao banco)", () => {
+    const r = planoReorganizacao(itens, 14, "2026-11-13");
+    expect(r.map((m) => [m.item.id, m.de, m.para])).toEqual([
+      ["y", "2026-11-23", "2026-11-30"],
+      ["b", "2027-01-06", "2026-12-09"],
+      ["z", "2026-11-30", "2026-12-14"],
+      ["d", "2027-01-27", "2026-12-23"],
+    ]);
+  });
+  it("nada muda se o espaçamento já é o novo intervalo; intervalo inválido não planeja", () => {
+    expect(planoReorganizacao(itens.filter((i) => i.serie_id === "s2"), 7, "2026-11-13")).toEqual([]);
+    expect(planoReorganizacao(itens, 0, "2026-11-13")).toEqual([]);
+    expect(planoReorganizacao(itens, 400, "2026-11-13")).toEqual([]);
+  });
+  it("ignora passados, cancelados e agendamentos fora de série", () => {
+    const r = planoReorganizacao(itens, 30, "2026-11-13");
+    expect(r.some((m) => ["p", "c", "solto"].includes(m.item.id))).toBe(false);
   });
 });

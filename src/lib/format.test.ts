@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseValor } from "./format";
+import { inicioSemana, parseValor } from "./format";
 
 describe("parseValor", () => {
   it.each([
@@ -26,4 +26,13 @@ describe("parseValor", () => {
       expect(parseValor(texto)).toBeNaN();
     },
   );
+});
+
+describe("inicioSemana", () => {
+  it("volta até o domingo (o próprio domingo fica)", () => {
+    expect(inicioSemana("2026-11-13")).toBe("2026-11-08"); // sexta → domingo 8/11
+    expect(inicioSemana("2026-11-08")).toBe("2026-11-08"); // domingo
+    expect(inicioSemana("2026-11-14")).toBe("2026-11-08"); // sábado
+    expect(inicioSemana("2027-01-02")).toBe("2026-12-27"); // vira o ano
+  });
 });

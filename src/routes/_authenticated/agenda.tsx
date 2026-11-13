@@ -221,7 +221,7 @@ function Page() {
               <ChevronRight className="size-6" />
             </Button>
           </div>
-          <div className="grid grid-cols-7 gap-1 px-1 pt-2 text-center text-[11px] uppercase tracking-wide text-muted-foreground">
+          <div aria-hidden className="grid grid-cols-7 gap-1 px-1 pt-2 text-center text-[11px] uppercase tracking-wide text-muted-foreground">
             {grade.slice(0, 7).map((d) => <div key={d}>{diaSemanaCurto(d)}</div>)}
           </div>
           <div className="grid grid-cols-7 gap-1 px-1 pt-1">
