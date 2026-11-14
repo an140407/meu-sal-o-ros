@@ -9,7 +9,6 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -18,8 +17,10 @@ import { NativeSelect } from "./ui-bits";
 import { ClienteForm, emptyCliente } from "./ClienteForm";
 import { ServicosPicker } from "./ServicosPicker";
 import { RecorrenciaPicker } from "./RecorrenciaPicker";
+import { RemarcarSerie } from "./RemarcarSerie";
+import { useRemarcacaoSerie, type ModoSerie } from "./useRemarcacaoSerie";
 import {
-  STATUS_ATIVOS, aplicarAosProximosDaSerie, criarAgendamentosRecorrentes, salvarAtendimentoComItens, useAgenda,
+  STATUS_ATIVOS, criarAgendamentosRecorrentes, remarcarProximosDaSerie, salvarAtendimentoComItens, useAgenda,
   useClientes, useConfig, useMembrosSeries, type Atendimento, type Cliente,
 } from "@/lib/data";
 import { brl, hojeISO, horaAgora, horaHM, minutos } from "@/lib/format";
@@ -53,11 +54,13 @@ export function AvisoSaude({ cliente }: { cliente: Cliente | undefined }) {
 const VEZES_PADRAO = 4;
 
 export function AgendaForm({
-  open, onOpenChange, editing, dia, horaSugerida, clienteInicial,
+  open, onOpenChange, editing, dia, horaSugerida, clienteInicial, serieInicial = false,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   editing: Atendimento | null;
+  /** Abre a edição já em "Este e os próximos" (atalho "Remarcar a série"). */
+  serieInicial?: boolean;
   dia: string;
   horaSugerida: string;
   clienteInicial?: string | undefined;
@@ -81,8 +84,9 @@ export function AgendaForm({
   const [intervalo, setIntervalo] = useState(INTERVALO_PADRAO);
   const [vezes, setVezes] = useState(VEZES_PADRAO);
   const [puladas, setPuladas] = useState<Set<string>>(new Set());
-  // Série (ao editar)
-  const [aplicarProximos, setAplicarProximos] = useState(false);
+  // Série (ao editar): "Só este" ou "Este e os próximos", com os próximos que a Ana deixar marcados.
+  const [modoSerie, setModoSerie] = useState<ModoSerie>("este");
+  const [excluidosSerie, setExcluidosSerie] = useState<Set<string>>(new Set());
   const { data: series } = useMembrosSeries(editing?.serie_id ? [editing.serie_id] : []);
   const proximos = editing?.serie_id ? proximosDaSerie(editing.data, series?.get(editing.serie_id) ?? []) : [];
 
@@ -94,7 +98,8 @@ export function AgendaForm({
     setRepetir(false);
     setVezes(VEZES_PADRAO);
     setPuladas(new Set());
-    setAplicarProximos(false);
+    setModoSerie(serieInicial ? "proximos" : "este");
+    setExcluidosSerie(new Set());
     if (editing) {
       setClienteId(editing.cliente_id);
       setItens(itensParaForm(editing.itens));
@@ -108,7 +113,7 @@ export function AgendaForm({
       setHora(horaSugerida);
       setObs("");
     }
-  }, [open, editing, dia, horaSugerida, clienteInicial]);
+  }, [open, editing, dia, horaSugerida, clienteInicial, serieInicial]);
 
   // O intervalo começa no da cliente (ficha) ou no padrão.
   useEffect(() => {
@@ -138,12 +143,28 @@ export function AgendaForm({
 
   const datasSerie = repetir && !editing ? gerarDatas(data, intervalo, vezes).filter((d) => !puladas.has(d)) : [data];
 
+  const remarcacao = useRemarcacaoSerie({
+    ativo: !!editing && modoSerie === "proximos" && proximos.length > 0,
+    proximos,
+    dataAntes: editing?.data ?? data,
+    dataNova: data,
+    horaNova: hora,
+    duracao: dur,
+    excluidos: excluidosSerie,
+    idAtual: editing?.id,
+    hoje,
+  });
+  const levarProximos = !!editing && modoSerie === "proximos" && remarcacao.selecionados.length > 0;
+
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     if (!clienteId) return void toast.error("Escolha a cliente.");
     const v = validarItens(itens);
     if ("erro" in v) return void toast.error(v.erro);
     if (!data || !hora) return void toast.error("Informe data e hora.");
+    if (levarProximos && remarcacao.passado) {
+      return void toast.error("Algum dos próximos cairia numa data que já passou. Desmarque ou escolha outra data.");
+    }
 
     setSaving(true);
     const { data: ocupados, error } = await supabase
@@ -156,12 +177,26 @@ export function AgendaForm({
     const conflitos = conflitosDasDatas(
       datasSerie, hora, dur, (ocupados as Omit<Ocupado, "cliente">[]).map((o) => ({ ...o, cliente: "" })), editing ? [editing.id] : [],
     );
-    if (conflitos.size > 0) {
-      return void setAviso(
-        datasSerie.length > 1
-          ? `${plural(conflitos.size, "data tem", "datas têm")} horário ocupado. Agendar mesmo assim?`
-          : "Já existe atendimento neste horário. Agendar mesmo assim?",
-      );
+    const nProximos = levarProximos ? remarcacao.conflitos.size : 0;
+    if (conflitos.size > 0 || nProximos > 0) {
+      const partes = [
+        conflitos.size > 0
+          ? datasSerie.length > 1
+            ? `${plural(conflitos.size, "data tem", "datas têm")} horário ocupado.`
+            : "Já existe atendimento neste horário."
+          : "",
+        nProximos > 0
+          ? `${plural(nProximos, "dos próximos bate", "dos próximos batem")} com outro atendimento: ${remarcacao.selecionados
+              .filter((r) => remarcacao.conflitos.has(r.item.id))
+              .slice(0, 3)
+              .map((r) => {
+                const o = remarcacao.conflitos.get(r.item.id)!;
+                return `${r.para.slice(8, 10)}/${r.para.slice(5, 7)} (${o.cliente.split(" ")[0]} ${horaHM(o.hora)})`;
+              })
+              .join(", ")}${nProximos > 3 ? " e outros" : ""}.`
+          : "",
+      ].filter(Boolean);
+      return void setAviso(`${partes.join(" ")} Salvar mesmo assim?`);
     }
     await gravar();
   }
@@ -187,13 +222,23 @@ export function AgendaForm({
         );
         toast.success(`${editing ? "Agendamento atualizado" : "Agendado"} · ${brl(atendimento.valor_bruto)}`);
         if (duracaoAjustada) toast.warning(`A duração total foi limitada a ${atendimento.duracao_min} min.`);
-        if (editing && aplicarProximos && proximos.length > 0) {
+        if (editing && levarProximos) {
           try {
-            const n = await aplicarAosProximosDaSerie(editing.id);
-            toast.success(`${plural(n, "próximo da série atualizado", "próximos da série atualizados")}`);
+            const n = await remarcarProximosDaSerie({
+              atendimentoId: editing.id,
+              dataAntes: editing.data,
+              ids: remarcacao.selecionados.map((r) => r.item.id),
+              hoje,
+            });
+            const mudouQuando = data !== editing.data || hora !== horaHM(editing.hora);
+            toast.success(
+              mudouQuando
+                ? `${plural(n, "próximo da série remarcado", "próximos da série remarcados")}`
+                : `${plural(n, "próximo da série atualizado", "próximos da série atualizados")}`,
+            );
           } catch (err) {
             console.error(err);
-            toast.error("Este foi salvo, mas os próximos da série não foram atualizados.");
+            toast.error(mensagemErro(err, "Este foi salvo, mas os próximos da série não mudaram. Tente de novo pelo próximo."));
           }
         }
       }
@@ -225,7 +270,9 @@ export function AgendaForm({
   const rotuloBotao = saving
     ? "Salvando..."
     : editing
-      ? "Salvar"
+      ? levarProximos
+        ? `Salvar este e ${plural(remarcacao.selecionados.length, "próximo", "próximos")}`
+        : "Salvar"
       : repetir && datasSerie.length > 1
         ? `Agendar ${datasSerie.length} vezes`
         : "Agendar";
@@ -343,19 +390,21 @@ export function AgendaForm({
                 )}
 
                 {editing && proximos.length > 0 && (
-                  <label className="flex min-h-11 items-start gap-3 rounded-2xl border bg-card p-3.5">
-                    <Checkbox
-                      className="mt-0.5"
-                      checked={aplicarProximos}
-                      onCheckedChange={(c) => setAplicarProximos(c === true)}
-                    />
-                    <span className="text-sm">
-                      <b>Aplicar também aos próximos da série</b>
-                      <span className="block text-muted-foreground">
-                        Hora, serviços e observações vão para {plural(proximos.length, "agendamento", "agendamentos")}. A data não muda.
-                      </span>
-                    </span>
-                  </label>
+                  <RemarcarSerie
+                    modo={modoSerie}
+                    onModo={setModoSerie}
+                    total={proximos.length}
+                    dataAntes={editing.data}
+                    horaAntes={horaHM(editing.hora)}
+                    dataNova={data}
+                    horaNova={hora}
+                    plano={remarcacao.plano}
+                    excluidos={excluidosSerie}
+                    onExcluidos={setExcluidosSerie}
+                    conflitos={remarcacao.conflitos}
+                    conferindo={remarcacao.conferindo}
+                    hoje={hoje}
+                  />
                 )}
 
                 <div className="space-y-2">
@@ -381,7 +430,7 @@ export function AgendaForm({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Voltar</AlertDialogCancel>
-            <AlertDialogAction onClick={gravar} disabled={saving}>Agendar mesmo assim</AlertDialogAction>
+            <AlertDialogAction onClick={gravar} disabled={saving}>{editing ? "Salvar mesmo assim" : "Agendar mesmo assim"}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

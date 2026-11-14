@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  conflitosDasDatas, gerarDatas, intervaloDaSerie, intervaloValido, planoReorganizacao, posicaoNaSerie, proximosDaSerie, resumoSerie,
+  conflitosDasDatas, gerarDatas, intervaloDaSerie, intervaloValido, planoRemarcacao, planoReorganizacao, posicaoNaSerie, proximosDaSerie,
+  resumoSerie, textoDeslocamento,
   type Membro, type Ocupado,
 } from "./recorrencia";
 
@@ -115,5 +116,33 @@ describe("planoReorganizacao", () => {
   it("ignora passados, cancelados e agendamentos fora de série", () => {
     const r = planoReorganizacao(itens, 30, "2026-11-13");
     expect(r.some((m) => ["p", "c", "solto"].includes(m.item.id))).toBe(false);
+  });
+});
+
+describe("planoRemarcacao", () => {
+  // Mesmo cenário testado no banco (0009): série de 21 em 21 às 13:00.
+  const proximos: Membro[] = [
+    { id: "c", data: "2027-01-18", status: "agendado", serie_id: "s", hora: "13:00:00" },
+    { id: "b", data: "2026-12-07", status: "agendado", serie_id: "s", hora: "13:00:00" },
+  ];
+  it("mesmo dia, horário novo: as datas ficam, a hora muda", () => {
+    const r = planoRemarcacao(proximos, "2026-11-16", "2026-11-16", "09:00");
+    expect(r.map((m) => [m.item.id, m.de, m.para, m.horaDe, m.horaPara])).toEqual([
+      ["b", "2026-12-07", "2026-12-07", "13:00", "09:00"],
+      ["c", "2027-01-18", "2027-01-18", "13:00", "09:00"],
+    ]);
+  });
+  it("muda o dia: todos andam o mesmo tanto (inclusive para trás e virando o ano)", () => {
+    expect(planoRemarcacao(proximos, "2026-11-16", "2026-11-17", "13:00").map((m) => m.para)).toEqual(["2026-12-08", "2027-01-19"]);
+    expect(planoRemarcacao(proximos, "2026-11-16", "2026-11-14", "13:00").map((m) => m.para)).toEqual(["2026-12-05", "2027-01-16"]);
+    expect(planoRemarcacao(proximos, "2026-11-16", "2026-12-30", "13:00").map((m) => m.para)).toEqual(["2027-01-20", "2027-03-03"]);
+  });
+  it("sem hora nova, mantém a de cada um", () => {
+    expect(planoRemarcacao(proximos, "2026-11-16", "2026-11-16", "")[0]?.horaPara).toBe("13:00");
+  });
+  it("texto do deslocamento", () => {
+    expect(textoDeslocamento(0)).toBe("");
+    expect(textoDeslocamento(1)).toBe("+1 dia");
+    expect(textoDeslocamento(-3)).toBe("−3 dias");
   });
 });

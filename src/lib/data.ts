@@ -341,7 +341,7 @@ export const useMembrosSeries = (serieIds: string[]) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("atendimentos")
-        .select("id, data, status, serie_id")
+        .select("id, data, hora, status, serie_id")
         .in("serie_id", ids);
       if (error) throw error;
       const m = new Map<string, Membro[]>();
@@ -379,8 +379,19 @@ export async function criarAgendamentosRecorrentes(p: {
 }
 
 /** Copia hora, duração, observações e serviços para os próximos 'agendado' da série. Devolve quantos mudaram. */
-export async function aplicarAosProximosDaSerie(atendimentoId: string): Promise<number> {
-  const { data, error } = await supabase.rpc("aplicar_aos_proximos_da_serie", { p_atendimento_id: atendimentoId });
+/**
+ * "Este e os próximos": depois de salvar este agendamento (já com data/hora nova), leva para os
+ * próximos escolhidos o mesmo deslocamento de dias, o horário, os serviços, a duração, as
+ * observações e a cliente deste — tudo numa transação. Devolve quantos mudaram.
+ */
+export async function remarcarProximosDaSerie(p: { atendimentoId: string; dataAntes: string; ids: string[]; hoje: string }): Promise<number> {
+  if (p.ids.length === 0) return 0;
+  const { data, error } = await supabase.rpc("remarcar_proximos_da_serie", {
+    p_atendimento_id: p.atendimentoId,
+    p_data_antes: p.dataAntes,
+    p_ids: p.ids,
+    p_hoje: p.hoje,
+  });
   if (error) throw error;
   return data ?? 0;
 }

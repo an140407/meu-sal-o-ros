@@ -1,4 +1,4 @@
-import { minutos, somarDias } from "./format";
+import { diasDesde, horaHM, minutos, somarDias } from "./format";
 
 /** Limite de agendamentos criados de uma vez (o banco também recusa acima disso). */
 export const MAX_VEZES = 60;
@@ -61,7 +61,7 @@ export function resumoSerie(datas: string[], puladas: Set<string>, conflitos: Ma
   };
 }
 
-export type Membro = { id: string; data: string; status: string; serie_id: string | null };
+export type Membro = { id: string; data: string; status: string; serie_id: string | null; hora?: string | null };
 
 /** Posição do agendamento na série, por data: { n: 3, m: 12 }. */
 export function posicaoNaSerie(id: string, membros: Membro[]): { n: number; m: number } | null {
@@ -117,4 +117,36 @@ export function planoReorganizacao<T extends Membro>(itens: T[], intervalo: numb
     });
   }
   return out.sort((a, b) => a.para.localeCompare(b.para));
+}
+
+export type Remarcacao<T> = { item: T; de: string; para: string; horaDe: string; horaPara: string };
+
+/**
+ * "Este e os próximos" ao editar um agendamento de série: cada próximo anda os mesmos dias que
+ * este andou (data nova − data antiga, pode ser negativo) e fica no horário novo — o intervalo
+ * entre eles não muda. Mesma regra da função remarcar_proximos_da_serie do banco.
+ */
+export function planoRemarcacao<T extends Membro>(
+  proximos: T[],
+  dataAntes: string,
+  dataDepois: string,
+  horaDepois: string,
+): Remarcacao<T>[] {
+  const delta = diasDesde(dataAntes, dataDepois);
+  return [...proximos]
+    .sort((a, b) => a.data.localeCompare(b.data) || a.id.localeCompare(b.id))
+    .map((item) => ({
+      item,
+      de: item.data,
+      para: somarDias(item.data, delta),
+      horaDe: horaHM(item.hora),
+      horaPara: horaHM(horaDepois) || horaHM(item.hora),
+    }));
+}
+
+/** "+1 dia", "−2 dias", "" (mesmo dia). */
+export function textoDeslocamento(dias: number): string {
+  if (dias === 0) return "";
+  const n = Math.abs(dias);
+  return `${dias > 0 ? "+" : "−"}${n} ${n === 1 ? "dia" : "dias"}`;
 }

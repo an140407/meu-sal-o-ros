@@ -94,6 +94,7 @@ function Page() {
   const [cancelarSerie, setCancelarSerie] = useState<Atendimento | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
+  const [serieInicial, setSerieInicial] = useState(false);
   const [editing, setEditing] = useState<Atendimento | null>(null);
   const [acoes, setAcoes] = useState<Atendimento | null>(null);
   const [concluir, setConcluir] = useState<Atendimento | null>(null);
@@ -111,6 +112,7 @@ function Page() {
     if (clienteBusca) {
       setClienteInicial(clienteBusca);
       setEditing(null);
+      setSerieInicial(false);
       setFormOpen(true);
     }
     // Limpa a URL para não reaplicar ao recarregar.
@@ -303,7 +305,7 @@ function Page() {
               <h2 className="text-xl">{diaPorExtenso(dia)}</h2>
               <span className="shrink-0 text-sm text-muted-foreground">{inicioExp}–{fimExp}</span>
             </div>
-            <Button size="xl" onClick={() => { setEditing(null); setClienteInicial(undefined); setFormOpen(true); }}>
+            <Button size="xl" onClick={() => { setEditing(null); setClienteInicial(undefined); setSerieInicial(false); setFormOpen(true); }}>
               <Plus /> Agendar
             </Button>
 
@@ -373,7 +375,12 @@ function Page() {
                 {acoes.status === "agendado" && (
                   <>
                     <Button size="xl" onClick={() => { setConcluir(acoes); setAcoes(null); }}><Check /> Concluir</Button>
-                    <Button size="xl" variant="secondary" onClick={() => { setEditing(acoes); setAcoes(null); setFormOpen(true); }}><Pencil /> Editar</Button>
+                    <Button size="xl" variant="secondary" onClick={() => { setEditing(acoes); setSerieInicial(false); setAcoes(null); setFormOpen(true); }}><Pencil /> Editar</Button>
+                    {proximosDaSerie(acoes.data, membrosDe(acoes)).length > 0 && (
+                      <Button size="xl" variant="secondary" onClick={() => { setEditing(acoes); setSerieInicial(true); setAcoes(null); setFormOpen(true); }}>
+                        <Repeat /> Remarcar este e os próximos
+                      </Button>
+                    )}
                     <Button size="xl" variant="outline" onClick={() => confirmarWhatsapp(acoes)}><MessageCircle /> Confirmar por WhatsApp</Button>
                     <Button size="xl" variant="outline" onClick={() => adicionarGoogleAgenda(acoes)}><CalendarPlus /> Adicionar ao Google Agenda</Button>
                     <div className="grid grid-cols-2 gap-3">
@@ -396,7 +403,7 @@ function Page() {
                 {(acoes.status === "cancelado" || acoes.status === "faltou") && (
                   <>
                     <Button size="xl" disabled={mudandoStatus} onClick={() => mudarStatus(acoes, "agendado", "Voltou para agendado")}><RotateCcw /> Voltar para agendado</Button>
-                    <Button size="xl" variant="secondary" onClick={() => { setEditing(acoes); setAcoes(null); setFormOpen(true); }}><Pencil /> Editar</Button>
+                    <Button size="xl" variant="secondary" onClick={() => { setEditing(acoes); setSerieInicial(false); setAcoes(null); setFormOpen(true); }}><Pencil /> Editar</Button>
                   </>
                 )}
                 {acoes.status === "realizado" && (
@@ -448,7 +455,7 @@ function Page() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AgendaForm open={formOpen} onOpenChange={setFormOpen} editing={editing} dia={dia} horaSugerida={horaSugerida} clienteInicial={clienteInicial} />
+      <AgendaForm open={formOpen} onOpenChange={setFormOpen} editing={editing} dia={dia} horaSugerida={horaSugerida} clienteInicial={clienteInicial} serieInicial={serieInicial} />
       <ConcluirForm atendimento={concluir} onClose={() => setConcluir(null)} />
       <AtendimentoForm open={!!editRealizado} onOpenChange={(o) => !o && setEditRealizado(null)} editing={editRealizado} />
     </>

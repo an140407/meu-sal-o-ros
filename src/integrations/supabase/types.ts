@@ -415,6 +415,15 @@ export type Database = {
         Args: { p_atendimento_id: string; p_itens: Json; p_pagamentos: Json }
         Returns: undefined
       }
+      remarcar_proximos_da_serie: {
+        Args: {
+          p_atendimento_id: string
+          p_data_antes: string
+          p_hoje: string
+          p_ids: string[]
+        }
+        Returns: number
+      }
       substituir_itens_atendimento: {
         Args: { p_atendimento_id: string; p_itens: Json }
         Returns: undefined
