@@ -19,6 +19,7 @@ import { AgendaForm, AvisoSaude } from "@/components/app/AgendaForm";
 import { AtendimentoForm } from "@/components/app/AtendimentoForm";
 import { ServicosPicker } from "@/components/app/ServicosPicker";
 import { PagamentosPicker } from "@/components/app/PagamentosPicker";
+import { PainelDoDia } from "@/components/app/PainelDoDia";
 import { RecorrenciaPicker } from "@/components/app/RecorrenciaPicker";
 import {
   STATUS_ATIVOS, criarAgendamentosRecorrentes, proximoMes, salvarAtendimentoComItens, useAgenda, useClientes, useConfig,
@@ -29,7 +30,7 @@ import {
 } from "@/lib/recorrencia";
 import { plural } from "@/lib/texto";
 import { itensParaForm, nomesItens, somaItens, totaisForm, validarItens, type ItemForm } from "@/lib/itens";
-import { formaPrincipal, partesIniciais, validarPagamentos, type ParteForm } from "@/lib/pagamentos";
+import { formaPrincipal, partesIniciais, recebedoresLabel, validarPagamentos, type ParteForm } from "@/lib/pagamentos";
 import { mensagemErro } from "@/lib/erros";
 import {
   brl, dataBR, diaDoMes, diaPorExtenso, diaSemanaCurto, hojeISO, horaAgora, horaDeMinutos, horaHM,
@@ -306,6 +307,8 @@ function Page() {
               <Plus /> Agendar
             </Button>
 
+            {!isLoading && <PainelDoDia dia={dia} atendimentos={doDia} dona={cfg?.nome_dona ?? "Simone"} />}
+
             {isLoading ? <Empty>Carregando...</Empty> : doDia.length === 0 ? (
               <div className="flex flex-col items-center gap-2 rounded-2xl bg-rose-gradient px-5 py-10 text-center">
                 <CalendarDays className="size-8 text-primary" aria-hidden />
@@ -339,6 +342,12 @@ function Page() {
                         <span className="shrink-0 font-semibold tabular-nums">{brl(a.valor_bruto)}</span>
                       </div>
                       <div className="line-clamp-2 text-sm text-muted-foreground">{nomesItens(a.itens)}</div>
+                      {a.status === "realizado" && recebedoresLabel(a.pagamentos, cfg?.nome_dona ?? "Simone") && (
+                        <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                          <span aria-hidden className="size-2 rounded-[3px] bg-parte-dona" />
+                          {recebedoresLabel(a.pagamentos, cfg?.nome_dona ?? "Simone")}
+                        </div>
+                      )}
                     </button>
                   </li>
                 ))}
@@ -587,7 +596,7 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
         </DrawerHeader>
         <form onSubmit={salvar} className="space-y-5 overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
           <ServicosPicker itens={itens} onChange={setItens} />
-          <PagamentosPicker total={total} partes={partes} onChange={setPartes} taxas={taxas} />
+          <PagamentosPicker total={total} partes={partes} onChange={setPartes} taxas={taxas} dona={cfg?.nome_dona ?? "Simone"} />
 
           {jaTem ? (
             <p className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-2.5 text-sm text-secondary-foreground">

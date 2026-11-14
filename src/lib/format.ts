@@ -14,6 +14,10 @@ const agora = () => {
 
 export const hojeISO = () => agora().data;
 
+const fmtHora = new Intl.DateTimeFormat("pt-BR", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+/** Hora (HH:MM, fuso do salão) de um instante gravado pelo banco, ex.: created_at. */
+export const horaDoInstante = (ts: string | null | undefined) => (ts ? fmtHora.format(new Date(ts)) : "");
+
 export const dataBR = (iso: string | null | undefined) => {
   if (!iso) return "";
   const [y, m, d] = iso.slice(0, 10).split("-");

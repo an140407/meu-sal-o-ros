@@ -4,6 +4,7 @@ import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase
 import { itensDoAtendimento, limitarDuracao, somaItens, type ItemServico } from "./itens";
 import { pagamentosDoAtendimento, type Pagamento } from "./pagamentos";
 import type { Membro, Ocupado } from "./recorrencia";
+import type { RepasseDiario } from "./acerto";
 import type { Forma } from "./format";
 
 export type Status = "agendado" | "realizado" | "cancelado" | "faltou";
@@ -13,7 +14,7 @@ export type Cliente = Tables<"clientes">;
 export type Servico = Tables<"servicos"> & { duracao_min: number };
 export type Config = Tables<"configuracoes"> & { hora_inicio: string | null; hora_fim: string | null };
 type ItemRow = ItemServico & { ordem: number };
-type PagamentoRow = { forma: string; valor: number; taxa_percentual: number; ordem: number };
+type PagamentoRow = { forma: string; valor: number; taxa_percentual: number; ordem: number; recebedor: string };
 export type Atendimento = Tables<"atendimentos"> & {
   status: Status;
   duracao_min: number;
@@ -29,7 +30,7 @@ export type Atendimento = Tables<"atendimentos"> & {
 
 /** Colunas lidas em toda consulta de atendimentos (inclui serviços e partes do pagamento). */
 const SELECT_ATENDIMENTO =
-  "*, clientes(nome), servicos(nome), atendimento_servicos(nome, valor, duracao_min, servico_id, ordem), atendimento_pagamentos(forma, valor, taxa_percentual, ordem)";
+  "*, clientes(nome), servicos(nome), atendimento_servicos(nome, valor, duracao_min, servico_id, ordem), atendimento_pagamentos(forma, valor, taxa_percentual, ordem, recebedor)";
 const ORDEM_ITENS = { referencedTable: "atendimento_servicos" } as const;
 
 const comItens = (rows: unknown): Atendimento[] =>
@@ -117,8 +118,6 @@ export const useAgenda = (inicio: string, fim: string) =>
     },
   });
 
-export type Repasse = Tables<"repasses">;
-
 export const proximoMes = (mes: string) => {
   const [y, m] = mes.split("-").map(Number) as [number, number];
   return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
@@ -178,17 +177,6 @@ export const useClientesComAgendamento = (hoje: string) =>
     },
   });
 
-/** Todos os repasses (para o saldo dos meses anteriores no Acerto). */
-export const useRepassesTodos = () =>
-  useQuery({
-    queryKey: ["repasses", "todos"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("repasses").select("*");
-      if (error) throw error;
-      return data;
-    },
-  });
-
 /** Todos os status, de `inicio` (inclusive) até `fim` (exclusive), para as estatísticas. */
 export const useAtendimentosPeriodo = (inicio: string, fim: string) =>
   useQuery({
@@ -223,20 +211,53 @@ export const useDespesas = (mes: string) =>
     },
   });
 
-export const useRepasses = (mes: string) =>
+/** Concluídos de `desde` em diante (acerto diário entre a Ana e a dona). */
+export const useRealizadosDesde = (desde: string) =>
   useQuery({
-    queryKey: ["repasses", mes],
+    queryKey: ["atendimentos", "realizados-desde", desde],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("repasses")
-        .select("*")
-        .eq("mes_referencia", mes)
-        .order("data_recebimento")
-        .order("created_at");
+        .from("atendimentos")
+        .select(SELECT_ATENDIMENTO)
+        .order("ordem", ORDEM_ITENS)
+        .eq("status", "realizado")
+        .gte("data", desde)
+        .order("data")
+        .order("hora", { nullsFirst: false });
       if (error) throw error;
-      return data;
+      return comItens(data);
     },
   });
+
+/** Repasses diários de `desde` em diante (os dois sentidos). */
+export const useRepassesDiarios = (desde: string) =>
+  useQuery({
+    queryKey: ["repasses-diarios", desde],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("repasses_diarios")
+        .select("id, dia, de, valor, created_at")
+        .gte("dia", desde)
+        .order("dia")
+        .order("created_at");
+      if (error) throw error;
+      return data as RepasseDiario[];
+    },
+  });
+
+/** Grava repasses confirmados (um por dia) e devolve os ids, para o "Desfazer". */
+export async function registrarRepasses(repasses: { dia: string; de: "ana" | "simone"; valor: number }[]): Promise<string[]> {
+  if (repasses.length === 0) return [];
+  const { data, error } = await supabase.from("repasses_diarios").insert(repasses).select("id");
+  if (error) throw error;
+  return (data ?? []).map((r) => r.id);
+}
+
+export async function excluirRepasses(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabase.from("repasses_diarios").delete().in("id", ids);
+  if (error) throw error;
+}
 
 /**
  * Grava o atendimento, seus serviços e (se vierem) as partes do pagamento. Nunca grava
@@ -248,7 +269,7 @@ export async function salvarAtendimentoComItens(
   id: string | null,
   campos: Omit<TablesUpdate<"atendimentos">, "valor_bruto" | "valor_liquido" | "servico_id" | "duracao_min">,
   itens: ItemServico[],
-  pagamentos?: { forma: Forma; valor: number }[],
+  pagamentos?: { forma: Forma; valor: number; recebedor: "ana" | "simone" }[],
 ): Promise<{ atendimento: Atendimento; duracaoAjustada: boolean }> {
   if (itens.length === 0) throw new Error("Atendimento sem serviços.");
   const { duracao, ajustada } = limitarDuracao(somaItens(itens).duracao);
@@ -274,7 +295,7 @@ export async function salvarAtendimentoComItens(
     ? await supabase.rpc("salvar_itens_e_pagamentos", {
         p_atendimento_id: atendimentoId!,
         p_itens: pItens,
-        p_pagamentos: pagamentos.map((p) => ({ forma: p.forma, valor: p.valor })),
+        p_pagamentos: pagamentos.map((p) => ({ forma: p.forma, valor: p.valor, recebedor: p.recebedor })),
       })
     : await supabase.rpc("substituir_itens_atendimento", { p_atendimento_id: atendimentoId!, p_itens: pItens });
   if (eItens) {

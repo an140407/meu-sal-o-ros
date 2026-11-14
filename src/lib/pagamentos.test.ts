@@ -1,31 +1,32 @@
 import { describe, expect, it } from "vitest";
 import {
   dividirPagamento, formaPrincipal, formasLabel, pagamentosDoAtendimento, partesIniciais, partesTexto,
-  resumoPagamentos, totaisPorForma, validarPagamentos, type ParteForm,
+  recebedoresLabel, resumoPagamentos, totaisPorForma, validarPagamentos, type ParteForm, type Recebedor,
 } from "./pagamentos";
 
 const taxas = { debito: 1.99, credito: 4.98 };
 /** Intl usa espaço não separável entre "R$" e o número. */
 const sp = (s: string) => s.replace(/\u00a0/g, " ");
-const parte = (forma: ParteForm["forma"], valor: string, key: string = forma): ParteForm => ({ key, forma, valor });
+const parte = (forma: ParteForm["forma"], valor: string, key: string = forma, recebedor: Recebedor = "ana"): ParteForm =>
+  ({ key, forma, valor, recebedor });
 
 describe("pagamentosDoAtendimento", () => {
   it("ordena as partes gravadas", () => {
     const p = pagamentosDoAtendimento({
       forma_pagamento: "pix", valor_bruto: 150, taxa_percentual: 0,
       atendimento_pagamentos: [
-        { forma: "credito", valor: "80", taxa_percentual: "4.98", ordem: 1 },
+        { forma: "credito", valor: "80", taxa_percentual: "4.98", ordem: 1, recebedor: "simone" },
         { forma: "pix", valor: 70, taxa_percentual: 0, ordem: 0 },
       ],
     });
     expect(p).toEqual([
-      { forma: "pix", valor: 70, taxa_percentual: 0 },
-      { forma: "credito", valor: 80, taxa_percentual: 4.98 },
+      { forma: "pix", valor: 70, taxa_percentual: 0, recebedor: "ana" },
+      { forma: "credito", valor: 80, taxa_percentual: 4.98, recebedor: "simone" },
     ]);
   });
   it("concluído antigo sem partes vira uma parte com a forma e o bruto", () => {
     expect(pagamentosDoAtendimento({ forma_pagamento: "credito", valor_bruto: "100", taxa_percentual: "4", atendimento_pagamentos: [] }))
-      .toEqual([{ forma: "credito", valor: 100, taxa_percentual: 4 }]);
+      .toEqual([{ forma: "credito", valor: 100, taxa_percentual: 4, recebedor: "ana" }]);
   });
   it("serviço grátis não tem parte", () => {
     expect(pagamentosDoAtendimento({ forma_pagamento: "pix", valor_bruto: 0, taxa_percentual: 0 })).toEqual([]);
@@ -75,8 +76,8 @@ describe("resumoPagamentos", () => {
 
 describe("validarPagamentos", () => {
   it("devolve as partes quando fecham", () => {
-    expect(validarPagamentos([parte("pix", "R$ 70,00"), parte("credito", "80")], 150))
-      .toEqual({ pagamentos: [{ forma: "pix", valor: 70 }, { forma: "credito", valor: 80 }] });
+    expect(validarPagamentos([parte("pix", "R$ 70,00"), parte("credito", "80", "c", "simone")], 150))
+      .toEqual({ pagamentos: [{ forma: "pix", valor: 70, recebedor: "ana" }, { forma: "credito", valor: 80, recebedor: "simone" }] });
   });
   it("total zero dispensa pagamento", () => {
     expect(validarPagamentos([parte("pix", "")], 0)).toEqual({ pagamentos: [] });
@@ -108,8 +109,8 @@ describe("dividirPagamento", () => {
 describe("totaisPorForma", () => {
   it("soma por forma na ordem fixa, com a taxa gravada", () => {
     const r = totaisPorForma([
-      { pagamentos: [{ forma: "credito", valor: 80, taxa_percentual: 4.98 }, { forma: "pix", valor: 70, taxa_percentual: 0 }] },
-      { pagamentos: [{ forma: "credito", valor: 100, taxa_percentual: 4 }, { forma: "debito", valor: 50, taxa_percentual: 1.99 }] },
+      { pagamentos: [{ forma: "credito", valor: 80, taxa_percentual: 4.98, recebedor: "ana" }, { forma: "pix", valor: 70, taxa_percentual: 0, recebedor: "ana" }] },
+      { pagamentos: [{ forma: "credito", valor: 100, taxa_percentual: 4, recebedor: "simone" }, { forma: "debito", valor: 50, taxa_percentual: 1.99, recebedor: "ana" }] },
       { pagamentos: [] },
     ]);
     expect(r).toEqual([
@@ -117,5 +118,28 @@ describe("totaisPorForma", () => {
       { forma: "debito", valor: 50, taxa: 1 },
       { forma: "credito", valor: 180, taxa: 7.98 },
     ]);
+  });
+});
+
+describe("quem recebeu", () => {
+  it("resumo soma por quem recebeu", () => {
+    const r = resumoPagamentos([parte("pix", "60", "a", "simone"), parte("credito", "40")], 100, taxas);
+    expect(r.porRecebedor).toEqual({ ana: 40, simone: 60 });
+  });
+  it("dividir: a parte nova começa com a Ana e a antiga mantém quem recebeu", () => {
+    const r = dividirPagamento([parte("pix", "150", "a", "simone")], 150);
+    expect(r.map((p) => p.recebedor)).toEqual(["simone", "ana"]);
+  });
+  it("partes iniciais trazem quem recebeu (padrão Ana)", () => {
+    const r = partesIniciais([{ forma: "pix", valor: 50, recebedor: "simone" }, { forma: "credito", valor: 50 }], 100);
+    expect(r.map((p) => p.recebedor)).toEqual(["simone", "ana"]);
+    expect(partesIniciais([], 70)[0]?.recebedor).toBe("ana");
+  });
+  it("rótulos e texto", () => {
+    expect(recebedoresLabel([{ recebedor: "ana" }], "Simone")).toBe("");
+    expect(recebedoresLabel([{ recebedor: "simone" }], "Simone")).toBe("Recebido pela Simone");
+    expect(recebedoresLabel([{ recebedor: "ana" }, { recebedor: "simone" }], "Simone")).toBe("Ana + Simone receberam");
+    expect(sp(partesTexto([{ forma: "pix", valor: 60, recebedor: "simone" }, { forma: "credito", valor: 40, recebedor: "ana" }], "Simone")))
+      .toBe("Pix R$ 60,00 (Simone) + Crédito R$ 40,00");
   });
 });

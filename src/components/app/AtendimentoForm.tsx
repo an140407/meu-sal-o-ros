@@ -164,7 +164,7 @@ export function AtendimentoForm({
                     <Input id="at-hora" className="h-12 text-base" type="time" step={60} value={hora} onChange={(e) => setHora(e.target.value)} />
                   </div>
                 </div>
-                <PagamentosPicker total={total} partes={partes} onChange={setPartes} taxas={taxas} />
+                <PagamentosPicker total={total} partes={partes} onChange={setPartes} taxas={taxas} dona={cfg?.nome_dona ?? "Simone"} />
                 <div className="space-y-2">
                   <Label htmlFor="at-observacoes">Observações</Label>
                   <Textarea id="at-observacoes" value={obs} onChange={(e) => setObs(e.target.value)} maxLength={1000} className="text-base" />

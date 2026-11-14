@@ -3,25 +3,28 @@ import { AlertCircle, CircleCheck, Split, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { FORMAS, brl, parseValor } from "@/lib/format";
 import {
-  MAX_PARTES, dividirPagamento, resumoPagamentos, taxaDaForma, valorParaCampo, type ParteForm, type Taxas,
+  MAX_PARTES, RECEBEDORES, dividirPagamento, resumoPagamentos, taxaDaForma, valorParaCampo, type ParteForm, type Taxas,
 } from "@/lib/pagamentos";
 import { cn } from "@/lib/utils";
 
 const pctBR = (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
 
 /**
- * Como a cliente pagou: uma ou mais partes (até 4), cada uma com forma e valor em R$.
- * Com uma parte só, ela acompanha o total quando os serviços mudam. A validação final
- * fica em validarPagamentos.
+ * Como a cliente pagou: uma ou mais partes (até 4), cada uma com forma, valor em R$ e quem
+ * recebeu o dinheiro (Ana ou a dona do salão). Com uma parte só, ela acompanha o total quando
+ * os serviços mudam. A validação final fica em validarPagamentos.
  */
 export function PagamentosPicker({
-  total, partes, onChange, taxas,
+  total, partes, onChange, taxas, dona,
 }: {
   total: number;
   partes: ParteForm[];
   onChange: (partes: ParteForm[]) => void;
   taxas: Taxas;
+  /** Nome da dona do salão (configurações). */
+  dona: string;
 }) {
+  const nomeDe = (r: ParteForm["recebedor"]) => (r === "ana" ? "Ana" : dona);
   const id = useId();
   const r = resumoPagamentos(partes, total, taxas);
 
@@ -106,6 +109,24 @@ export function PagamentosPicker({
                   </button>
                 )}
               </div>
+              <div className="mt-2 grid grid-cols-2 gap-1.5" role="radiogroup" aria-label={`Quem recebeu a parte ${i + 1}`}>
+                {RECEBEDORES.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    role="radio"
+                    aria-checked={p.recebedor === r}
+                    onClick={() => alterar(p.key, { recebedor: r })}
+                    className={cn(
+                      "flex h-11 items-center justify-center gap-1.5 rounded-xl border text-sm transition-[transform,background-color] duration-150 ease-out active:scale-[0.97] motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                      p.recebedor === r ? "border-foreground/70 bg-foreground/[0.06] font-semibold" : "bg-card text-muted-foreground",
+                    )}
+                  >
+                    <span aria-hidden className={cn("size-2.5 rounded-[3px]", r === "ana" ? "bg-parte-ana" : "bg-parte-dona")} />
+                    {nomeDe(r)} recebeu
+                  </button>
+                ))}
+              </div>
               {taxa > 0 && Number.isFinite(valor) && valor > 0 && (
                 <p className="mt-1.5 px-1 text-xs text-muted-foreground tabular-nums">
                   Taxa {pctBR(taxa)} · desconta {brl((valor * taxa) / 100)}
@@ -132,6 +153,10 @@ export function PagamentosPicker({
           <span>
             Fechou <b>{brl(total)}</b>
             {r.taxas > 0 && <> · líquido <b>{brl(r.liquido)}</b></>}
+            {r.porRecebedor.simone > 0 &&
+              (r.porRecebedor.ana > 0
+                ? <> · Ana {brl(r.porRecebedor.ana)}, {dona} {brl(r.porRecebedor.simone)}</>
+                : <> · recebido pela {dona}</>)}
           </span>
         ) : r.invalida ? (
           <span>Preencha o valor de cada parte.</span>

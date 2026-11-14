@@ -21,6 +21,7 @@ export type Database = {
           forma: string
           id: string
           ordem: number
+          recebedor: string
           taxa_percentual: number
           user_id: string
           valor: number
@@ -31,6 +32,7 @@ export type Database = {
           forma: string
           id?: string
           ordem?: number
+          recebedor?: string
           taxa_percentual: number
           user_id?: string
           valor: number
@@ -41,6 +43,7 @@ export type Database = {
           forma?: string
           id?: string
           ordem?: number
+          recebedor?: string
           taxa_percentual?: number
           user_id?: string
           valor?: number
@@ -317,6 +320,33 @@ export type Database = {
           id?: string
           mes_referencia?: string
           observacao?: string | null
+          user_id?: string
+          valor?: number
+        }
+        Relationships: []
+      }
+      repasses_diarios: {
+        Row: {
+          created_at: string
+          de: string
+          dia: string
+          id: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string
+          de: string
+          dia: string
+          id?: string
+          user_id?: string
+          valor: number
+        }
+        Update: {
+          created_at?: string
+          de?: string
+          dia?: string
+          id?: string
           user_id?: string
           valor?: number
         }

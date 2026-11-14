@@ -1,7 +1,7 @@
 import { brl, dataBR, horaHM, mesAno } from "@/lib/format";
-import type { Atendimento } from "@/lib/data";
+import { useConfig, type Atendimento } from "@/lib/data";
 import { nomesItens } from "@/lib/itens";
-import { formasLabel } from "@/lib/pagamentos";
+import { formasLabel, recebedoresLabel } from "@/lib/pagamentos";
 import { plural } from "@/lib/texto";
 
 export function AtendimentoList({
@@ -12,6 +12,8 @@ export function AtendimentoList({
   mostrarCliente?: boolean;
   nomeDona?: string;
 }) {
+  const { data: cfg } = useConfig();
+  const dona = nomeDona ?? cfg?.nome_dona ?? "Simone";
   const grupos = new Map<string, Atendimento[]>();
   for (const a of itens) {
     const k = a.data.slice(0, 7);
@@ -60,6 +62,12 @@ export function AtendimentoList({
                     <div className="shrink-0 text-right">
                       <div className="font-semibold tabular-nums">{brl(a.valor_bruto)}</div>
                       <div className="text-xs text-muted-foreground">{formasLabel(a.pagamentos)}</div>
+                      {recebedoresLabel(a.pagamentos, dona) && (
+                        <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
+                          <span aria-hidden className="size-2 rounded-[3px] bg-parte-dona" />
+                          {recebedoresLabel(a.pagamentos, dona)}
+                        </div>
+                      )}
                       {Number(a.valor_liquido) < Number(a.valor_bruto) && (
                         <div className="text-xs text-muted-foreground tabular-nums">líq. {brl(a.valor_liquido)}</div>
                       )}

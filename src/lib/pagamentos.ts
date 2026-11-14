@@ -1,10 +1,15 @@
 import { FORMAS, brl, formaLabel, parseValor, type Forma } from "./format";
 
+/** Quem recebeu o dinheiro de uma parte: a Ana ou a dona do salão (no banco, sempre "simone"). */
+export type Recebedor = "ana" | "simone";
+export const RECEBEDORES: Recebedor[] = ["ana", "simone"];
+const comoRecebedor = (r: unknown): Recebedor => (r === "simone" ? "simone" : "ana");
+
 /** Uma parte do pagamento de um atendimento (tabela atendimento_pagamentos). */
-export type Pagamento = { forma: Forma; valor: number; taxa_percentual: number };
+export type Pagamento = { forma: Forma; valor: number; taxa_percentual: number; recebedor: Recebedor };
 
 /** Parte como digitada no formulário (valor em texto). */
-export type ParteForm = { key: string; forma: Forma; valor: string };
+export type ParteForm = { key: string; forma: Forma; valor: string; recebedor: Recebedor };
 
 /** Taxas atuais da maquininha, em %. */
 export type Taxas = { debito: number; credito: number };
@@ -28,7 +33,9 @@ export const novaChaveParte = () => `parte-${++seq}`;
  * com forma_pagamento e valor_bruto. Total 0 (serviço grátis) não tem parte.
  */
 export function pagamentosDoAtendimento(a: {
-  atendimento_pagamentos?: { forma: string; valor: number | string; taxa_percentual: number | string; ordem: number }[] | null;
+  atendimento_pagamentos?:
+    | { forma: string; valor: number | string; taxa_percentual: number | string; ordem: number; recebedor?: string | null }[]
+    | null;
   forma_pagamento: string;
   valor_bruto: number | string;
   taxa_percentual: number | string;
@@ -37,11 +44,16 @@ export function pagamentosDoAtendimento(a: {
   if (lista.length > 0) {
     return [...lista]
       .sort((x, y) => x.ordem - y.ordem)
-      .map((p) => ({ forma: p.forma as Forma, valor: Number(p.valor), taxa_percentual: Number(p.taxa_percentual) }));
+      .map((p) => ({
+        forma: p.forma as Forma,
+        valor: Number(p.valor),
+        taxa_percentual: Number(p.taxa_percentual),
+        recebedor: comoRecebedor(p.recebedor),
+      }));
   }
   const bruto = Number(a.valor_bruto);
   return bruto > 0
-    ? [{ forma: a.forma_pagamento as Forma, valor: bruto, taxa_percentual: Number(a.taxa_percentual) }]
+    ? [{ forma: a.forma_pagamento as Forma, valor: bruto, taxa_percentual: Number(a.taxa_percentual), recebedor: "ana" }]
     : [];
 }
 
@@ -49,9 +61,21 @@ export function pagamentosDoAtendimento(a: {
 export const formasLabel = (pagamentos: { forma: string }[]) =>
   pagamentos.length === 0 ? "Sem cobrança" : [...new Set(pagamentos.map((p) => formaLabel(p.forma)))].join(" + ");
 
-/** "Pix R$ 70,00 + Crédito R$ 80,00" */
-export const partesTexto = (pagamentos: { forma: string; valor: number }[]) =>
-  pagamentos.map((p) => `${formaLabel(p.forma)} ${brl(p.valor)}`).join(" + ");
+/** "Pix R$ 70,00 + Crédito R$ 80,00"; com `dona`, marca as partes que ela recebeu: "Pix R$ 70,00 (Simone)". */
+export const partesTexto = (pagamentos: { forma: string; valor: number; recebedor?: Recebedor }[], dona?: string) =>
+  pagamentos
+    .map((p) => `${formaLabel(p.forma)} ${brl(p.valor)}${dona && p.recebedor === "simone" ? ` (${dona})` : ""}`)
+    .join(" + ");
+
+/**
+ * Quem recebeu, para listas: "" quando foi tudo com a Ana (o normal), "Recebido pela Simone"
+ * quando foi tudo com a dona, "Ana + Simone receberam" quando dividiu.
+ */
+export function recebedoresLabel(pagamentos: { recebedor: Recebedor }[], dona: string): string {
+  const quem = new Set(pagamentos.map((p) => p.recebedor));
+  if (!quem.has("simone")) return "";
+  return quem.has("ana") ? `Ana + ${dona} receberam` : `Recebido pela ${dona}`;
+}
 
 /** Forma de maior valor (a primeira em caso de empate); gravada em atendimentos.forma_pagamento. */
 export function formaPrincipal(pagamentos: { forma: Forma; valor: number }[]): Forma {
@@ -61,11 +85,16 @@ export function formaPrincipal(pagamentos: { forma: Forma; valor: number }[]): F
 }
 
 /** Partes iniciais do formulário: as gravadas ou, sem nenhuma, Pix com o total. */
-export function partesIniciais(pagamentos: { forma: Forma; valor: number }[], total: number): ParteForm[] {
+export function partesIniciais(pagamentos: { forma: Forma; valor: number; recebedor?: Recebedor }[], total: number): ParteForm[] {
   if (pagamentos.length > 0) {
-    return pagamentos.map((p) => ({ key: novaChaveParte(), forma: p.forma, valor: valorParaCampo(p.valor) }));
+    return pagamentos.map((p) => ({
+      key: novaChaveParte(),
+      forma: p.forma,
+      valor: valorParaCampo(p.valor),
+      recebedor: comoRecebedor(p.recebedor),
+    }));
   }
-  return [{ key: novaChaveParte(), forma: "pix", valor: valorParaCampo(total) }];
+  return [{ key: novaChaveParte(), forma: "pix", valor: valorParaCampo(total), recebedor: "ana" }];
 }
 
 export type ResumoPagamentos = {
@@ -78,12 +107,15 @@ export type ResumoPagamentos = {
   /** Prévia das taxas com as taxas atuais e do líquido (válidos quando fechou). */
   taxas: number;
   liquido: number;
+  /** Quanto cada uma recebeu (valor digitado, antes das taxas). */
+  porRecebedor: Record<Recebedor, number>;
 };
 
 export function resumoPagamentos(partes: ParteForm[], total: number, taxas: Taxas): ResumoPagamentos {
   let soma = 0;
   let somaTaxas = 0;
   let invalida = false;
+  const porRecebedor: Record<Recebedor, number> = { ana: 0, simone: 0 };
   for (const p of partes) {
     const v = parseValor(p.valor);
     if (!Number.isFinite(v) || v <= 0) {
@@ -92,6 +124,7 @@ export function resumoPagamentos(partes: ParteForm[], total: number, taxas: Taxa
     }
     soma += v;
     somaTaxas += (v * taxaDaForma(p.forma, taxas)) / 100;
+    porRecebedor[p.recebedor] += v;
   }
   const diferenca = r2(total - soma);
   return {
@@ -101,6 +134,7 @@ export function resumoPagamentos(partes: ParteForm[], total: number, taxas: Taxa
     invalida,
     taxas: r2(somaTaxas),
     liquido: r2(total - somaTaxas),
+    porRecebedor: { ana: r2(porRecebedor.ana), simone: r2(porRecebedor.simone) },
   };
 }
 
@@ -111,14 +145,14 @@ export function resumoPagamentos(partes: ParteForm[], total: number, taxas: Taxa
 export function validarPagamentos(
   partes: ParteForm[],
   total: number,
-): { pagamentos: { forma: Forma; valor: number }[] } | { erro: string } {
+): { pagamentos: { forma: Forma; valor: number; recebedor: Recebedor }[] } | { erro: string } {
   if (centavos(total) === 0) return { pagamentos: [] };
   if (partes.length === 0) return { erro: "Informe a forma de pagamento." };
-  const out: { forma: Forma; valor: number }[] = [];
+  const out: { forma: Forma; valor: number; recebedor: Recebedor }[] = [];
   for (const p of partes) {
     const v = parseValor(p.valor);
     if (!Number.isFinite(v) || v <= 0) return { erro: `Valor inválido no ${formaLabel(p.forma)}.` };
-    out.push({ forma: p.forma, valor: r2(v) });
+    out.push({ forma: p.forma, valor: r2(v), recebedor: p.recebedor });
   }
   const diff = centavos(total) - centavos(out.reduce((s, p) => s + p.valor, 0));
   if (diff > 0) return { erro: `Faltam ${brl(diff / 100)} para fechar o total.` };
@@ -128,7 +162,7 @@ export function validarPagamentos(
 
 /**
  * "Dividir": acrescenta uma parte com o que falta. Se nada falta, divide a última ao meio.
- * A forma da parte nova é a primeira ainda não usada.
+ * A forma da parte nova é a primeira ainda não usada; quem recebeu começa como "ana".
  */
 export function dividirPagamento(partes: ParteForm[], total: number): ParteForm[] {
   if (partes.length >= MAX_PARTES) return partes;
@@ -139,18 +173,18 @@ export function dividirPagamento(partes: ParteForm[], total: number): ParteForm[
     return s + (Number.isFinite(v) ? v : 0);
   }, 0);
   const falta = r2(total - soma);
-  if (falta > 0) return [...partes, { key: novaChaveParte(), forma, valor: valorParaCampo(falta) }];
+  if (falta > 0) return [...partes, { key: novaChaveParte(), forma, valor: valorParaCampo(falta), recebedor: "ana" }];
 
   const ultima = partes[partes.length - 1];
   const vUltima = ultima ? parseValor(ultima.valor) : Number.NaN;
   if (!ultima || !Number.isFinite(vUltima) || vUltima <= 0.01) {
-    return [...partes, { key: novaChaveParte(), forma, valor: "" }];
+    return [...partes, { key: novaChaveParte(), forma, valor: "", recebedor: "ana" }];
   }
   const metade = Math.floor((vUltima * 100) / 2) / 100;
   return [
     ...partes.slice(0, -1),
     { ...ultima, valor: valorParaCampo(r2(vUltima - metade)) },
-    { key: novaChaveParte(), forma, valor: valorParaCampo(metade) },
+    { key: novaChaveParte(), forma, valor: valorParaCampo(metade), recebedor: "ana" },
   ];
 }
 

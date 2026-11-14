@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inicioSemana, parseValor } from "./format";
+import { horaDoInstante, inicioSemana, parseValor } from "./format";
 
 describe("parseValor", () => {
   it.each([
@@ -34,5 +34,13 @@ describe("inicioSemana", () => {
     expect(inicioSemana("2026-11-08")).toBe("2026-11-08"); // domingo
     expect(inicioSemana("2026-11-14")).toBe("2026-11-08"); // sábado
     expect(inicioSemana("2027-01-02")).toBe("2026-12-27"); // vira o ano
+  });
+});
+
+describe("horaDoInstante", () => {
+  it("converte para o horário de São Paulo", () => {
+    expect(horaDoInstante("2026-11-15T22:40:00Z")).toBe("19:40");
+    expect(horaDoInstante("2026-11-16T02:05:00+00:00")).toBe("23:05");
+    expect(horaDoInstante(null)).toBe("");
   });
 });

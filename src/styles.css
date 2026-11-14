@@ -52,6 +52,8 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-parte-ana: var(--parte-ana);
+  --color-parte-dona: var(--parte-dona);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -93,6 +95,11 @@
   --chart-3: oklch(0.5 0.04 20);
   --chart-4: oklch(0.8 0.06 30);
   --chart-5: oklch(0.6 0.08 350);
+  /* Divisão Ana × dona do salão (barra do dia e do mês). Par validado: daltonismo ΔE 17,4,
+     visão normal ΔE 20,2. O dourado tem contraste < 3:1 com o fundo, por isso sempre vai
+     acompanhado de legenda com nome e valor. */
+  --parte-ana: oklch(0.55 0.12 12);
+  --parte-dona: oklch(0.7 0.12 80);
   --sidebar: oklch(0.985 0.006 20);
   --sidebar-foreground: oklch(0.27 0.025 15);
   --sidebar-primary: oklch(0.56 0.1 12);
@@ -131,6 +138,8 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
+  --parte-ana: #c25a6b;
+  --parte-dona: #b8892f;
   --sidebar: oklch(0.208 0.042 265.755);
   --sidebar-foreground: oklch(0.984 0.003 247.858);
   --sidebar-primary: oklch(0.488 0.243 264.376);
