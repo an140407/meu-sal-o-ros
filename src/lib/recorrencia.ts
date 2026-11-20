@@ -49,19 +49,36 @@ export function conflitosDasDatas(
   return out;
 }
 
-/** Datas que serão criadas (sem as puladas), a última e quantas têm conflito. */
-export function resumoSerie(datas: string[], puladas: Set<string>, conflitos: Map<string, unknown>) {
-  const ativas = datas.filter((d) => !puladas.has(d));
+/**
+ * Datas que serão criadas (sem as puladas e sem as que caem num bloqueio), a última, quantas
+ * têm conflito e quantas ficam de fora por bloqueio.
+ */
+export function resumoSerie(
+  datas: string[],
+  puladas: Set<string>,
+  conflitos: Map<string, unknown>,
+  bloqueadas: Map<string, unknown> = new Map(),
+) {
+  const ativas = datas.filter((d) => !puladas.has(d) && !bloqueadas.has(d));
+  const bloq = datas.filter((d) => !puladas.has(d) && bloqueadas.has(d)).length;
   return {
     ativas,
     primeira: ativas[0] ?? null,
     ultima: ativas[ativas.length - 1] ?? null,
     conflitos: ativas.filter((d) => conflitos.has(d)).length,
-    puladas: datas.length - ativas.length,
+    puladas: datas.length - ativas.length - bloq,
+    bloqueadas: bloq,
   };
 }
 
-export type Membro = { id: string; data: string; status: string; serie_id: string | null; hora?: string | null };
+export type Membro = {
+  id: string;
+  data: string;
+  status: string;
+  serie_id: string | null;
+  hora?: string | null;
+  duracao_min?: number;
+};
 
 /** Posição do agendamento na série, por data: { n: 3, m: 12 }. */
 export function posicaoNaSerie(id: string, membros: Membro[]): { n: number; m: number } | null {

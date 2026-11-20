@@ -1,3 +1,4 @@
+import { diaInteiro, type Bloqueio } from "./bloqueios";
 import { horaDeMinutos, inicioSemana, minutos, somarDias } from "./format";
 
 const ATIVOS = ["agendado", "realizado"];
@@ -15,8 +16,9 @@ export function gradeMes(mes: string): string[] {
 
 /**
  * Inícios livres ("HH:MM") de `passo` em `passo` minutos dentro do expediente, cabendo a
- * `duracao` inteira sem sobrepor agendamentos ativos. `agora` (só para hoje) descarta horários
- * já passados; `ignorarId` tira o próprio atendimento ao editar.
+ * `duracao` inteira sem sobrepor agendamentos ativos nem bloqueios do dia (dia inteiro bloqueado =
+ * nenhum horário). `agora` (só para hoje) descarta horários já passados; `ignorarId` tira o
+ * próprio atendimento ao editar.
  */
 export function horariosLivres(p: {
   agendamentos: { id: string; hora: string | null; duracao_min: number; status: string }[];
@@ -26,12 +28,19 @@ export function horariosLivres(p: {
   ignorarId?: string | undefined;
   agora?: string | null | undefined;
   passo?: number;
+  /** Bloqueios do dia. */
+  bloqueios?: readonly Pick<Bloqueio, "hora_inicio" | "hora_fim">[] | undefined;
 }): string[] {
   const { duracao, passo = 30 } = p;
   if (!Number.isFinite(duracao) || duracao <= 0) return [];
-  const ocupados = p.agendamentos
-    .filter((a) => a.hora && a.id !== p.ignorarId && ATIVOS.includes(a.status))
-    .map((a) => ({ ini: minutos(a.hora!), fim: minutos(a.hora!) + a.duracao_min }));
+  const bloqueios = p.bloqueios ?? [];
+  if (bloqueios.some(diaInteiro)) return [];
+  const ocupados = [
+    ...p.agendamentos
+      .filter((a) => a.hora && a.id !== p.ignorarId && ATIVOS.includes(a.status))
+      .map((a) => ({ ini: minutos(a.hora!), fim: minutos(a.hora!) + a.duracao_min })),
+    ...bloqueios.map((b) => ({ ini: minutos(b.hora_inicio!), fim: minutos(b.hora_fim!) })),
+  ];
   const fimExp = minutos(p.fimExpediente);
   const minimo = p.agora ? minutos(p.agora) : -1;
   const livres: string[] = [];

@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, ArrowLeft, ArrowRight, CalendarPlus, MessageCircle, Phone, Plus, Repeat, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CalendarPlus, Lock, MessageCircle, Phone, Plus, Repeat, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +16,10 @@ import { ClienteForm } from "@/components/app/ClienteForm";
 import { AtendimentoList } from "@/components/app/AtendimentoList";
 import { AtendimentoForm } from "@/components/app/AtendimentoForm";
 import {
-  alterarRetornoCliente, excluirCliente, useAtendimentos, useClientes, useMembrosSeries, useOcupadosNasDatas,
-  useProximosDaCliente, type Atendimento, type Cliente,
+  alterarRetornoCliente, excluirCliente, useAtendimentos, useBloqueiosNasDatas, useClientes, useMembrosSeries,
+  useOcupadosNasDatas, useProximosDaCliente, type Atendimento, type Cliente,
 } from "@/lib/data";
+import { bloqueioQueImpede, horarioDoBloqueio, tituloBloqueio } from "@/lib/bloqueios";
 import { conflitosDasDatas, intervaloValido, planoReorganizacao, posicaoNaSerie, type Mudanca } from "@/lib/recorrencia";
 import { mensagemErro } from "@/lib/erros";
 import { plural } from "@/lib/texto";
@@ -345,7 +346,10 @@ function RetornoDaCliente({ cliente, proximos, hoje }: { cliente: Cliente; proxi
   );
 }
 
-/** Confirmação com as datas de antes → depois e aviso de horário ocupado. */
+/**
+ * Confirmação com as datas de antes → depois e aviso de horário ocupado. Se alguma data nova cai
+ * num bloqueio, o banco recusaria a reorganização inteira: o botão fica desligado e explica.
+ */
 function ReorganizarDialog({
   nome, dias, mudancas, salvando, onReorganizar, onSoSalvar, onCancelar,
 }: {
@@ -358,10 +362,20 @@ function ReorganizarDialog({
   onCancelar: () => void;
 }) {
   const { data: ocupados = [], isFetching } = useOcupadosNasDatas(mudancas.map((m) => m.para));
+  const { data: bloqueios = [], isFetching: buscandoBloqueios } = useBloqueiosNasDatas(mudancas.map((m) => m.para));
   const ids = mudancas.map((m) => m.item.id);
   const ocupado = (m: Mudanca<Atendimento>) =>
     conflitosDasDatas([m.para], m.item.hora ?? "", m.item.duracao_min, ocupados, ids).get(m.para);
+  // Mesma regra do banco: só a data muda (hora e duração ficam).
+  const bloqueado = (m: Mudanca<Atendimento>) =>
+    bloqueioQueImpede(
+      bloqueios,
+      { data: m.para, hora: m.item.hora, duracao: m.item.duracao_min },
+      { data: m.de, hora: m.item.hora, duracao: m.item.duracao_min },
+    );
   const conflitos = mudancas.filter((m) => ocupado(m)).length;
+  const bloqueadas = mudancas.filter((m) => bloqueado(m)).length;
+  const conferindo = isFetching || buscandoBloqueios;
   const primeiroNome = nome.split(" ")[0];
 
   return (
@@ -370,19 +384,25 @@ function ReorganizarDialog({
         <AlertDialogHeader className="text-left">
           <AlertDialogTitle>Reorganizar os próximos agendamentos?</AlertDialogTitle>
           <AlertDialogDescription>
-            Com retorno a cada {dias} dias, {plural(mudancas.length, "agendamento", "agendamentos")} de {primeiroNome} mudam
-            de data. O próximo de cada série continua no mesmo dia e horário.
+            Com retorno a cada {dias} dias, {plural(mudancas.length, "agendamento", "agendamentos")} de {primeiroNome}{" "}
+            {mudancas.length === 1 ? "muda" : "mudam"} de data. O próximo de cada série continua no mesmo dia e horário.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <ul className="max-h-56 space-y-1.5 overflow-y-auto rounded-xl bg-muted p-3 text-sm tabular-nums" aria-label="Datas que mudam">
           {mudancas.map((m) => {
             const o = ocupado(m);
+            const b = bloqueado(m);
             return (
               <li key={m.item.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="whitespace-nowrap text-muted-foreground line-through"><span className="sr-only">de </span>{dataBR(m.de).slice(0, 5)}</span>
                 <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
                 <span className="whitespace-nowrap font-semibold"><span className="sr-only">para </span>{diaSemanaCurto(m.para)}, {dataBR(m.para).slice(0, 5)}</span>
-                {o && (
+                {b && (
+                  <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-card px-2 py-0.5 text-xs font-semibold text-foreground ring-1 ring-border">
+                    <Lock className="size-3" aria-hidden /> bloqueado · {horarioDoBloqueio(b)} · {tituloBloqueio(b)}
+                  </span>
+                )}
+                {o && !b && (
                   <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-500">
                     <AlertTriangle className="size-3" aria-hidden /> ocupado · {o.cliente.split(" ")[0]} {horaHM(o.hora ?? "")}
                   </span>
@@ -391,19 +411,25 @@ function ReorganizarDialog({
             );
           })}
         </ul>
-        <p role="status" className={conflitos > 0 ? "text-sm text-amber-900" : "text-sm text-muted-foreground"}>
-          {isFetching
+        <p role="status" className={bloqueadas > 0 ? "text-sm font-medium text-foreground" : conflitos > 0 ? "text-sm text-amber-900" : "text-sm text-muted-foreground"}>
+          {conferindo
             ? "Conferindo horários…"
-            : conflitos > 0
-              ? `${plural(conflitos, "data cai", "datas caem")} em horário já ocupado. Dá para reorganizar mesmo assim e ajustar depois na Agenda.`
-              : "Nenhum horário ocupado nas novas datas."}
+            : bloqueadas > 0
+              ? `${plural(bloqueadas, "data nova cai", "datas novas caem")} num horário bloqueado, então não dá para reorganizar assim. Mude o bloqueio na Agenda ou só salve o intervalo.`
+              : conflitos > 0
+                ? `${plural(conflitos, "data cai", "datas caem")} em horário já ocupado. Dá para reorganizar mesmo assim e ajustar depois na Agenda.`
+                : "Nenhum horário ocupado nas novas datas."}
         </p>
         <AlertDialogFooter className="gap-2">
           <AlertDialogCancel className="mt-0 h-11" disabled={salvando}>Cancelar</AlertDialogCancel>
           <Button type="button" variant="outline" className="h-11" disabled={salvando} onClick={onSoSalvar}>
             Só salvar o intervalo
           </Button>
-          <AlertDialogAction className="h-11" disabled={salvando} onClick={(e) => { e.preventDefault(); onReorganizar(); }}>
+          <AlertDialogAction
+            className="h-11"
+            disabled={salvando || conferindo || bloqueadas > 0}
+            onClick={(e) => { e.preventDefault(); onReorganizar(); }}
+          >
             {salvando ? "Salvando…" : "Reorganizar"}
           </AlertDialogAction>
         </AlertDialogFooter>

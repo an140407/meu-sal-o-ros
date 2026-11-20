@@ -12,5 +12,7 @@ describe("mensagemErro", () => {
   });
   it("função que ainda não existe no banco avisa que falta o SQL", () => {
     expect(mensagemErro({ code: "PGRST202", message: "Could not find the function" }, "Erro")).toMatch(/SQL/);
+    expect(mensagemErro({ code: "PGRST205", message: "Could not find the table 'public.bloqueios'" }, "Erro")).toMatch(/SQL/);
+    expect(mensagemErro({ code: "42P01", message: 'relation "bloqueios" does not exist' }, "Erro")).toMatch(/SQL/);
   });
 });

@@ -165,6 +165,15 @@
   background-image: var(--gradient-rose);
 }
 
+/* Listras finas dos bloqueios de horário (junto com o cadeado; nunca só a cor). */
+@utility bg-hachura {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 6px,
+    color-mix(in oklch, var(--muted-foreground) 16%, transparent) 6px 7.5px
+  );
+}
+
 @layer base {
   html, body { font-family: var(--font-sans); -webkit-tap-highlight-color: transparent; }
   html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }

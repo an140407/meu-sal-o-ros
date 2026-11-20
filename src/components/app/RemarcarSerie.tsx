@@ -1,8 +1,9 @@
 import { useId } from "react";
-import { AlertTriangle, ArrowRight, Repeat } from "lucide-react";
+import { AlertTriangle, ArrowRight, Lock, Repeat } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { dataBR, diaSemanaCurto, diasDesde, horaHM } from "@/lib/format";
 import { textoDeslocamento, type Membro, type Ocupado, type Remarcacao } from "@/lib/recorrencia";
+import { horarioDoBloqueio, tituloBloqueio, type Bloqueio } from "@/lib/bloqueios";
 import type { ModoSerie } from "./useRemarcacaoSerie";
 import { plural } from "@/lib/texto";
 import { cn } from "@/lib/utils";
@@ -12,10 +13,11 @@ const dia = (iso: string) => `${diaSemanaCurto(iso)}, ${dataBR(iso).slice(0, 5)}
 /**
  * Bloco do formulário de edição quando o agendamento é de uma série: escolher entre mudar
  * "Só este" ou "Este e os próximos", ver as novas datas antes de salvar e desmarcar algum.
+ * Próximo cuja data nova cai num bloqueio não pode ir: fica desmarcado, como está.
  */
 export function RemarcarSerie({
   modo, onModo, total, dataAntes, horaAntes, dataNova, horaNova, plano, excluidos, onExcluidos,
-  conflitos, conferindo, hoje,
+  conflitos, bloqueados, conferindo, hoje,
 }: {
   modo: ModoSerie;
   onModo: (m: ModoSerie) => void;
@@ -29,6 +31,8 @@ export function RemarcarSerie({
   excluidos: Set<string>;
   onExcluidos: (s: Set<string>) => void;
   conflitos: Map<string, Ocupado>;
+  /** Próximos (por id) cuja data nova cai num bloqueio. */
+  bloqueados: Map<string, Bloqueio>;
   conferindo: boolean;
   hoje: string;
 }) {
@@ -36,8 +40,9 @@ export function RemarcarSerie({
   const delta = dataNova ? diasDesde(dataAntes, dataNova) : 0;
   const mudouHora = !!horaNova && horaHM(horaNova) !== horaHM(horaAntes);
   const mudou = delta !== 0 || mudouHora;
-  const marcados = plano.filter((r) => !excluidos.has(r.item.id)).length;
+  const marcados = plano.filter((r) => !excluidos.has(r.item.id) && !bloqueados.has(r.item.id)).length;
   const comConflito = [...conflitos.keys()].length;
+  const nBloqueados = plano.filter((r) => bloqueados.has(r.item.id)).length;
 
   const alternar = (itemId: string) => {
     const s = new Set(excluidos);
@@ -93,7 +98,8 @@ export function RemarcarSerie({
 
           <ul className="max-h-64 space-y-1 overflow-y-auto rounded-xl bg-muted p-2" aria-label="Próximos da série">
             {plano.map((r) => {
-              const marcado = !excluidos.has(r.item.id);
+              const b = bloqueados.get(r.item.id);
+              const marcado = !excluidos.has(r.item.id) && !b;
               const o = conflitos.get(r.item.id);
               const campo = `${id}-${r.item.id}`;
               const passou = marcado && r.para < hoje;
@@ -101,9 +107,13 @@ export function RemarcarSerie({
                 <li key={r.item.id}>
                   <label
                     htmlFor={campo}
-                    className={cn("flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 active:bg-background/60", !marcado && "opacity-60")}
+                    className={cn(
+                      "flex min-h-11 items-center gap-3 rounded-lg px-2 py-1.5",
+                      b ? "cursor-default" : "cursor-pointer active:bg-background/60",
+                      !marcado && !b && "opacity-60",
+                    )}
                   >
-                    <Checkbox id={campo} checked={marcado} onCheckedChange={() => alternar(r.item.id)} />
+                    <Checkbox id={campo} checked={marcado} disabled={!!b} onCheckedChange={() => alternar(r.item.id)} />
                     <span className="min-w-0 flex-1 text-sm tabular-nums">
                       <span className="flex flex-wrap items-center gap-x-1.5">
                         <span className={cn(marcado && (r.de !== r.para || r.horaDe !== r.horaPara) && "text-muted-foreground line-through")}>
@@ -119,6 +129,11 @@ export function RemarcarSerie({
                         )}
                         {!marcado && <span className="text-xs">(fica como está)</span>}
                       </span>
+                      {b && (
+                        <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-foreground ring-1 ring-border">
+                          <Lock className="size-3" aria-hidden /> {dia(r.para)} bloqueado · {horarioDoBloqueio(b)} · {tituloBloqueio(b)}
+                        </span>
+                      )}
                       {o && marcado && (
                         <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-500">
                           <AlertTriangle className="size-3" aria-hidden /> ocupado · {o.cliente.split(" ")[0]} {horaHM(o.hora)}
@@ -139,6 +154,7 @@ export function RemarcarSerie({
             {marcados > 0 && (conferindo ? " · conferindo horários…" : comConflito > 0
               ? ` · ${plural(comConflito, "bate", "batem")} com outro atendimento. Desmarque para manter como está.`
               : " · nenhum horário ocupado.")}
+            {nBloqueados > 0 && !conferindo && ` ${nBloqueados === 1 ? "1 cai num bloqueio e fica como está." : `${nBloqueados} caem em bloqueio e ficam como estão.`}`}
           </p>
         </>
       )}

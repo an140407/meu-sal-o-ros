@@ -65,6 +65,8 @@ export const inicioSemana = (iso: string) => somarDias(iso, -calendario(iso).get
 
 const DIAS_CURTOS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+/** 0 = domingo … 6 = sábado. */
+export const diaDaSemana = (iso: string) => calendario(iso).getUTCDay();
 export const diaSemanaCurto = (iso: string) => DIAS_CURTOS[calendario(iso).getUTCDay()];
 export const diaDoMes = (iso: string) => partes(iso)[2];
 /** "Segunda", "Terça"... */

@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight, Minus, Plus } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Lock, Minus, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useOcupadosNasDatas } from "@/lib/data";
 import { gradeMes } from "@/lib/agenda";
@@ -7,6 +7,7 @@ import { dataBR, diaDoMes, diaPorExtenso, horaHM, mesAno, somarDias } from "@/li
 import {
   INTERVALOS, MAX_VEZES, conflitosDasDatas, gerarDatas, intervaloValido, resumoSerie,
 } from "@/lib/recorrencia";
+import { horarioDoBloqueio, tituloBloqueio, type Bloqueio } from "@/lib/bloqueios";
 import { plural } from "@/lib/texto";
 import { cn } from "@/lib/utils";
 
@@ -14,14 +15,17 @@ const SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
 const proximoMesDe = (mes: string) => somarDias(`${mes}-28`, 7).slice(0, 7);
 const mesAnteriorDe = (mes: string) => somarDias(`${mes}-01`, -1).slice(0, 7);
 
+const SEM_BLOQUEIO = new Map<string, Bloqueio>();
+
 /**
  * Intervalo ("a cada X dias"), quantidade de vezes e mini calendário com as datas da série.
  * Datas com horário ocupado ficam em âmbar; tocar numa data da série a pula; tocar em outro
- * dia muda a primeira data. A primeira data não pode ser pulada.
+ * dia muda a primeira data. A primeira data não pode ser pulada. Datas que caem num bloqueio
+ * (`bloqueadas`, calculadas por quem usa) ficam de fora, com cadeado.
  */
 export function RecorrenciaPicker({
   inicio, onInicio, hora, duracao, intervalo, onIntervalo, vezes, onVezes, puladas, onPuladas,
-  hoje, ignorarIds = [], textoVezes = "incluindo este",
+  hoje, ignorarIds = [], textoVezes = "incluindo este", bloqueadas = SEM_BLOQUEIO,
 }: {
   inicio: string;
   onInicio: (d: string) => void;
@@ -36,12 +40,17 @@ export function RecorrenciaPicker({
   hoje: string;
   ignorarIds?: string[];
   textoVezes?: string;
+  /** Datas da série que caem num bloqueio (ficam de fora). */
+  bloqueadas?: Map<string, Bloqueio>;
 }) {
   const id = useId();
   const datas = gerarDatas(inicio, intervalo, vezes);
   const { data: ocupados = [], isFetching } = useOcupadosNasDatas(datas);
-  const conflitos = conflitosDasDatas(datas, hora, duracao, ocupados, ignorarIds);
-  const resumo = resumoSerie(datas, puladas, conflitos);
+  const conflitos = conflitosDasDatas(datas.filter((d) => !bloqueadas.has(d)), hora, duracao, ocupados, ignorarIds);
+  const resumo = resumoSerie(datas, puladas, conflitos, bloqueadas);
+  const primeiraBloqueada = bloqueadas.get(datas[0] ?? "");
+  // Outras datas (fora a primeira) que ficam de fora por bloqueio.
+  const outrasBloqueadas = datas.filter((d, i) => i > 0 && !puladas.has(d) && bloqueadas.has(d));
 
   const [mes, setMes] = useState(inicio.slice(0, 7));
   useEffect(() => setMes(inicio.slice(0, 7)), [inicio]);
@@ -55,7 +64,7 @@ export function RecorrenciaPicker({
 
   function tocarDia(d: string) {
     const i = datas.indexOf(d);
-    if (i === 0) return;
+    if (i === 0 || (i > 0 && bloqueadas.has(d))) return;
     if (i > 0) {
       const novo = new Set(puladas);
       if (novo.has(d)) novo.delete(d);
@@ -180,21 +189,23 @@ export function RecorrenciaPicker({
             const i = datas.indexOf(d);
             const naSerie = i >= 0;
             const pulada = puladas.has(d);
-            const ocupada = naSerie && !pulada && conflitos.has(d);
+            const bloq = naSerie && !pulada ? bloqueadas.get(d) : undefined;
+            const ocupada = naSerie && !pulada && !bloq && conflitos.has(d);
             const fora = !d.startsWith(mes);
             const passado = d < hoje && !naSerie;
             const rotulo = [
               diaPorExtenso(d),
               naSerie ? `agendamento ${i + 1} de ${datas.length}` : "",
+              bloq ? `bloqueado (${tituloBloqueio(bloq)}), fica de fora` : "",
               ocupada ? "horário ocupado" : "",
               pulada ? "pulado" : "",
-              i === 0 ? "primeira data" : naSerie ? (pulada ? "toque para incluir" : "toque para pular") : passado ? "" : "toque para começar aqui",
+              i === 0 ? "primeira data" : bloq ? "" : naSerie ? (pulada ? "toque para incluir" : "toque para pular") : passado ? "" : "toque para começar aqui",
             ].filter(Boolean).join(", ");
             return (
               <button
                 key={d}
                 type="button"
-                disabled={passado}
+                disabled={passado || (!!bloq && i > 0)}
                 onClick={() => tocarDia(d)}
                 aria-label={rotulo}
                 className={cn(
@@ -202,13 +213,15 @@ export function RecorrenciaPicker({
                   fora && !naSerie && "text-muted-foreground/50",
                   passado && "text-muted-foreground/40",
                   d === hoje && !naSerie && "font-semibold text-primary ring-1 ring-primary",
-                  naSerie && !pulada && !ocupada && "bg-primary font-semibold text-primary-foreground",
+                  naSerie && !pulada && !ocupada && !bloq && "bg-primary font-semibold text-primary-foreground",
+                  bloq && "bg-muted bg-hachura font-semibold text-muted-foreground line-through ring-1 ring-border",
                   ocupada && "bg-amber-50 font-bold text-amber-900 ring-2 ring-amber-500",
                   pulada && "text-muted-foreground line-through outline-dashed outline-1 -outline-offset-2 outline-muted-foreground",
                 )}
               >
                 {diaDoMes(d)}
                 {ocupada && <span className="absolute bottom-1 size-1 rounded-full bg-amber-600" aria-hidden />}
+                {bloq && <Lock className="absolute -right-0.5 -top-0.5 size-3.5 rounded-full bg-card p-0.5 text-foreground" aria-hidden />}
               </button>
             );
           })}
@@ -232,6 +245,27 @@ export function RecorrenciaPicker({
         )}
       </div>
 
+      {(primeiraBloqueada || outrasBloqueadas.length > 0) && (
+        <div role="status" className="space-y-1 rounded-xl border bg-muted p-3 text-sm text-foreground">
+          {primeiraBloqueada && (
+            <p className="flex gap-2 font-semibold">
+              <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>A primeira data ({dataBR(datas[0]!).slice(0, 5)}) está bloqueada. Troque o horário ou toque em outro dia para começar nele.</span>
+            </p>
+          )}
+          {outrasBloqueadas.slice(0, 3).map((d) => {
+            const b = bloqueadas.get(d)!;
+            return (
+              <p key={d} className="flex gap-2">
+                <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <span><b>{dataBR(d).slice(0, 5)}: bloqueado</b> ({horarioDoBloqueio(b)} · {tituloBloqueio(b)}). Fica de fora.</span>
+              </p>
+            );
+          })}
+          {outrasBloqueadas.length > 3 && <p className="pl-6">e mais {plural(outrasBloqueadas.length - 3, "data", "datas")}.</p>}
+        </div>
+      )}
+
       {conflitosAtivos.length > 0 && (
         <div role="status" className="space-y-1 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           {conflitosAtivos.slice(0, 3).map((d) => {
@@ -251,6 +285,7 @@ export function RecorrenciaPicker({
         {plural(resumo.ativas.length, "agendamento", "agendamentos")}
         {resumo.ultima ? ` · até ${dataBR(resumo.ultima)}` : ""}
         {resumo.puladas > 0 ? ` · ${plural(resumo.puladas, "pulado", "pulados")}` : ""}
+        {resumo.bloqueadas > 0 ? ` · ${plural(resumo.bloqueadas, "bloqueado", "bloqueados")}` : ""}
         {isFetching ? " · conferindo horários…" : ""}
       </p>
     </div>

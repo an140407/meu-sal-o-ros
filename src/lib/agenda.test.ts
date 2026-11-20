@@ -36,6 +36,13 @@ describe("horariosLivres", () => {
     expect(horariosLivres({ ...base, fimExpediente: "10:00", agendamentos: [ag("1", "08:00", 60)] })).toEqual(["09:00"]);
   });
 
+  it("bloqueio com horário ocupa como um agendamento; dia inteiro bloqueado não tem horário", () => {
+    const bloqueios = [{ hora_inicio: "09:00:00", hora_fim: "10:00:00" }];
+    expect(horariosLivres({ ...base, bloqueios })).toEqual(["08:00", "10:00", "10:30", "11:00"]);
+    expect(horariosLivres({ ...base, bloqueios, agendamentos: [ag("1", "10:30", 30)] })).toEqual(["08:00", "11:00"]);
+    expect(horariosLivres({ ...base, bloqueios: [...bloqueios, { hora_inicio: null, hora_fim: null }] })).toEqual([]);
+  });
+
   it("hoje: descarta horários já passados", () => {
     expect(horariosLivres({ ...base, agora: "09:10" })).toEqual(["09:30", "10:00", "10:30", "11:00"]);
     expect(horariosLivres({ ...base, agora: "09:30" })).toEqual(["09:30", "10:00", "10:30", "11:00"]);

@@ -5,6 +5,7 @@ import { itensDoAtendimento, limitarDuracao, somaItens, type ItemServico } from 
 import { pagamentosDoAtendimento, type Pagamento } from "./pagamentos";
 import type { Membro, Ocupado } from "./recorrencia";
 import type { RepasseDiario } from "./acerto";
+import { novaSerieId, type Bloqueio } from "./bloqueios";
 import type { Forma } from "./format";
 
 export type Status = "agendado" | "realizado" | "cancelado" | "faltou";
@@ -332,7 +333,7 @@ export const useOcupadosNasDatas = (datas: string[], ativo = true) =>
     },
   });
 
-/** Todos os agendamentos das séries informadas (id, data, status), agrupados por serie_id. */
+/** Todos os agendamentos das séries informadas (id, data, hora, duração, status), agrupados por serie_id. */
 export const useMembrosSeries = (serieIds: string[]) => {
   const ids = [...new Set(serieIds)].sort();
   return useQuery({
@@ -341,7 +342,7 @@ export const useMembrosSeries = (serieIds: string[]) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("atendimentos")
-        .select("id, data, hora, status, serie_id")
+        .select("id, data, hora, duracao_min, status, serie_id")
         .in("serie_id", ids);
       if (error) throw error;
       const m = new Map<string, Membro[]>();
@@ -378,7 +379,6 @@ export async function criarAgendamentosRecorrentes(p: {
   return data ?? [];
 }
 
-/** Copia hora, duração, observações e serviços para os próximos 'agendado' da série. Devolve quantos mudaram. */
 /**
  * "Este e os próximos": depois de salvar este agendamento (já com data/hora nova), leva para os
  * próximos escolhidos o mesmo deslocamento de dias, o horário, os serviços, a duração, as
@@ -416,4 +416,98 @@ export async function alterarRetornoCliente(p: { clienteId: string; dias: number
   });
   if (error) throw error;
   return data ?? 0;
+}
+
+// ——— Bloqueios de horário ———
+
+const SELECT_BLOQUEIO = "id, data, hora_inicio, hora_fim, descricao, serie_id";
+/** Sem a tabela (SQL ainda não aplicado) não insiste: a agenda segue sem bloqueios. */
+const semTabela = (err: unknown) => ["PGRST205", "42P01"].includes((err as { code?: string } | null)?.code ?? "");
+const tentarDeNovo = (falhas: number, err: unknown) => !semTabela(err) && falhas < 3;
+
+/** Bloqueios de `inicio` a `fim` (inclusive), por data e hora (dia inteiro primeiro). */
+export const useBloqueios = (inicio: string, fim: string) =>
+  useQuery({
+    queryKey: ["bloqueios", "periodo", inicio, fim],
+    retry: tentarDeNovo,
+    enabled: !!inicio && !!fim,
+    queryFn: async (): Promise<Bloqueio[]> => {
+      const { data, error } = await supabase
+        .from("bloqueios")
+        .select(SELECT_BLOQUEIO)
+        .gte("data", inicio)
+        .lte("data", fim)
+        .order("data")
+        .order("hora_inicio", { nullsFirst: true })
+        .order("hora_fim", { nullsFirst: true });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+/** Bloqueios nas datas informadas (séries, retorno, remarcar e reorganizar). */
+export const useBloqueiosNasDatas = (datas: string[], ativo = true) => {
+  const unicas = [...new Set(datas.filter(Boolean))].sort();
+  return useQuery({
+    queryKey: ["bloqueios", "datas", unicas.join(",")],
+    retry: tentarDeNovo,
+    enabled: ativo && unicas.length > 0,
+    queryFn: async (): Promise<Bloqueio[]> => {
+      const { data, error } = await supabase.from("bloqueios").select(SELECT_BLOQUEIO).in("data", unicas);
+      if (error) throw error;
+      return data;
+    },
+  });
+};
+
+/** Todos os bloqueios de uma série, por data. */
+export const useSerieDeBloqueios = (serieId: string | null | undefined) =>
+  useQuery({
+    queryKey: ["bloqueios", "serie", serieId ?? ""],
+    retry: tentarDeNovo,
+    enabled: !!serieId,
+    queryFn: async (): Promise<Bloqueio[]> => {
+      const { data, error } = await supabase.from("bloqueios").select(SELECT_BLOQUEIO).eq("serie_id", serieId!).order("data");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+type CamposBloqueio = { hora_inicio: string | null; hora_fim: string | null; descricao: string | null };
+/** Um bloqueio ou "este e os próximos" de uma série (a partir da data dele). */
+export type AlvoBloqueio = { id: string } | { serieId: string; aPartirDe: string };
+
+/** Cria um bloqueio por data, numa gravação só; com mais de uma data, todos ficam na mesma série. */
+export async function criarBloqueios(p: { datas: string[] } & CamposBloqueio): Promise<number> {
+  const datas = [...new Set(p.datas)].sort();
+  if (datas.length === 0) return 0;
+  const serie_id = datas.length > 1 ? novaSerieId() : null;
+  const linhas = datas.map((data) => ({ data, hora_inicio: p.hora_inicio, hora_fim: p.hora_fim, descricao: p.descricao, serie_id }));
+  const { error } = await supabase.from("bloqueios").insert(linhas);
+  if (error) throw error;
+  return linhas.length;
+}
+
+/** Muda horas e descrição (e, num bloqueio só, a data). Devolve quantos mudaram. */
+export async function atualizarBloqueios(alvo: AlvoBloqueio, campos: CamposBloqueio & { data?: string }): Promise<number> {
+  const q = supabase.from("bloqueios").update(campos);
+  const { data, error } = await ("id" in alvo ? q.eq("id", alvo.id) : q.eq("serie_id", alvo.serieId).gte("data", alvo.aPartirDe)).select("id");
+  if (error) throw error;
+  return (data ?? []).length;
+}
+
+/** Exclui um bloqueio ou "este e os próximos" da série. Devolve quantos saíram. */
+export async function excluirBloqueios(alvo: AlvoBloqueio): Promise<number> {
+  const q = supabase.from("bloqueios").delete();
+  const { data, error } = await ("id" in alvo ? q.eq("id", alvo.id) : q.eq("serie_id", alvo.serieId).gte("data", alvo.aPartirDe)).select("id");
+  if (error) throw error;
+  return (data ?? []).length;
+}
+
+/** Desfazer a exclusão: grava de novo os mesmos bloqueios (mesmo id e série). */
+export async function restaurarBloqueios(bloqueios: Bloqueio[]): Promise<void> {
+  if (bloqueios.length === 0) return;
+  const linhas = bloqueios.map(({ id, data, hora_inicio, hora_fim, descricao, serie_id }) => ({ id, data, hora_inicio, hora_fim, descricao, serie_id }));
+  const { error } = await supabase.from("bloqueios").insert(linhas);
+  if (error) throw error;
 }

@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Ban, CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, MessageCircle, Pencil, Plus, Repeat, RotateCcw, UserX } from "lucide-react";
+import { Ban, CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Lock, MessageCircle, Pencil, Plus, Repeat, RotateCcw, UserX } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
@@ -21,15 +21,20 @@ import { ServicosPicker } from "@/components/app/ServicosPicker";
 import { PagamentosPicker } from "@/components/app/PagamentosPicker";
 import { PainelDoDia } from "@/components/app/PainelDoDia";
 import { RecorrenciaPicker } from "@/components/app/RecorrenciaPicker";
+import { BloqueioAcoes, CartaoBloqueio, FaixaDiaBloqueado } from "@/components/app/BloqueioAcoes";
 import {
-  STATUS_ATIVOS, criarAgendamentosRecorrentes, proximoMes, salvarAtendimentoComItens, useAgenda, useClientes, useConfig,
-  useMembrosSeries, useProximosDaCliente, type Atendimento, type Status,
+  STATUS_ATIVOS, criarAgendamentosRecorrentes, proximoMes, salvarAtendimentoComItens, useAgenda, useBloqueios,
+  useBloqueiosNasDatas, useClientes, useConfig, useMembrosSeries, useProximosDaCliente, type Atendimento, type Status,
 } from "@/lib/data";
+import {
+  bloqueioQueImpede, datasBloqueadas, diaInteiro, horarioDoBloqueio, pularBloqueios, textoImpedimento, tituloBloqueio,
+  type Bloqueio,
+} from "@/lib/bloqueios";
 import {
   INTERVALO_PADRAO, gerarDatas, intervaloDaSerie, posicaoNaSerie, proximosDaSerie, type Membro,
 } from "@/lib/recorrencia";
 import { plural } from "@/lib/texto";
-import { itensParaForm, nomesItens, somaItens, totaisForm, validarItens, type ItemForm } from "@/lib/itens";
+import { itensParaForm, limitarDuracao, nomesItens, somaItens, totaisForm, validarItens, type ItemForm } from "@/lib/itens";
 import { formaPrincipal, partesIniciais, recebedoresLabel, validarPagamentos, type ParteForm } from "@/lib/pagamentos";
 import { mensagemErro } from "@/lib/erros";
 import {
@@ -86,6 +91,12 @@ function Page() {
     visao === "mes" ? grade[0]! : inicio,
     visao === "mes" ? grade[grade.length - 1]! : dias[6]!,
   );
+  // Sem a tabela (SQL ainda não aplicado) a consulta falha e a agenda segue sem bloqueios.
+  const { data: bloqueios = [] } = useBloqueios(
+    visao === "mes" ? grade[0]! : inicio,
+    visao === "mes" ? grade[grade.length - 1]! : dias[6]!,
+  );
+  const [bloqueioAberto, setBloqueioAberto] = useState<Bloqueio | null>(null);
   const { data: cfg } = useConfig();
   const { data: clientes = [] } = useClientes();
   const qc = useQueryClient();
@@ -123,18 +134,33 @@ function Page() {
   const ativosPorDia = new Map<string, number>();
   for (const a of semana.filter(ativo)) ativosPorDia.set(a.data, (ativosPorDia.get(a.data) ?? 0) + 1);
   const doDia = semana.filter((a) => a.data === dia);
+  // Bloqueios: por dia (cadeado na semana e no mês), os do dia aberto e quem ficou dentro deles.
+  const bloqPorDia = new Map<string, { diaTodo: boolean }>();
+  for (const b of bloqueios) bloqPorDia.set(b.data, { diaTodo: (bloqPorDia.get(b.data)?.diaTodo ?? false) || diaInteiro(b) });
+  const bloqDoDia = bloqueios.filter((b) => b.data === dia);
+  const bloqDiaTodo = bloqDoDia.filter(diaInteiro);
+  const noBloqueio = (a: Atendimento) =>
+    a.status === "agendado" ? bloqueioQueImpede(bloqueios, { data: a.data, hora: a.hora, duracao: a.duracao_min }) : null;
+  // Na lista do dia, bloqueios com horário entram na ordem da hora (antes de quem começa junto).
+  const linhas: ({ tipo: "b"; b: Bloqueio; chave: string } | { tipo: "a"; a: Atendimento; chave: string })[] = [
+    ...bloqDoDia.filter((b) => !diaInteiro(b)).map((b) => ({ tipo: "b" as const, b, chave: horaHM(b.hora_inicio) })),
+    ...doDia.map((a) => ({ tipo: "a" as const, a, chave: a.hora ? horaHM(a.hora) : "99:99" })),
+  ].sort((x, y) => x.chave.localeCompare(y.chave));
 
   const inicioExp = horaHM(cfg?.hora_inicio) || "08:00";
   const fimExp = horaHM(cfg?.hora_fim) || "19:00";
   // Sugere o fim do último agendamento ativo do dia (hoje: nunca antes de agora, arredondado a 15 min),
-  // se ainda couber no expediente.
+  // pulando horários bloqueados, se ainda couber no expediente.
   const agoraArredondado = dia === hoje ? Math.ceil(minutos(horaAgora()) / 15) * 15 : 0;
-  const ultimoFim = Math.max(
-    ...doDia.filter((a) => ativo(a) && a.hora).map((a) => minutos(a.hora!) + a.duracao_min),
-    minutos(inicioExp),
-    agoraArredondado,
+  const ultimoFim = pularBloqueios(
+    Math.max(
+      ...doDia.filter((a) => ativo(a) && a.hora).map((a) => minutos(a.hora!) + a.duracao_min),
+      minutos(inicioExp),
+      agoraArredondado,
+    ),
+    bloqDoDia,
   );
-  const horaSugerida = ultimoFim < minutos(fimExp) ? horaDeMinutos(ultimoFim) : inicioExp;
+  const horaSugerida = horaDeMinutos(ultimoFim < minutos(fimExp) ? ultimoFim : pularBloqueios(minutos(inicioExp), bloqDoDia));
 
   const abrir = (url: string) => window.open(url, "_blank", "noopener,noreferrer");
 
@@ -190,6 +216,9 @@ function Page() {
         },
       },
     });
+    // Voltar para agendado não é barrado pelo bloqueio (o horário já era dele), mas avisa.
+    const b = status === "agendado" ? bloqueioQueImpede(bloqueios, { data: a.data, hora: a.hora, duracao: a.duracao_min }) : null;
+    if (b) toast.warning(`Fica dentro de um bloqueio (${horarioDoBloqueio(b)} · ${tituloBloqueio(b)}). Remarque se precisar.`);
   }
 
   return (
@@ -231,27 +260,34 @@ function Page() {
             {grade.map((d) => {
               const n = ativosPorDia.get(d) ?? 0;
               const foraDoMes = !d.startsWith(mes);
+              const bl = bloqPorDia.get(d);
               return (
                 <button
                   key={d}
                   type="button"
                   onClick={() => { setDia(d); setVisao("dia"); }}
-                  aria-label={`${diaPorExtenso(d)}${d === hoje ? " (hoje)" : ""}, ${plural(n, "agendamento", "agendamentos")}`}
+                  aria-label={`${diaPorExtenso(d)}${d === hoje ? " (hoje)" : ""}, ${plural(n, "agendamento", "agendamentos")}${bl ? (bl.diaTodo ? ", dia bloqueado" : ", com horário bloqueado") : ""}`}
                   className={cn(
                     "flex h-16 flex-col items-center justify-start gap-1 rounded-xl pt-1.5 active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     foraDoMes && "text-muted-foreground/60",
                     d === hoje && "bg-secondary font-semibold text-primary ring-1 ring-primary",
+                    bl?.diaTodo && "bg-muted bg-hachura",
                   )}
                 >
                   <span className="text-base leading-tight">{diaDoMes(d)}</span>
-                  {n > 0 && (
-                    <span
-                      className={cn(
-                        "min-w-6 rounded-full px-1.5 text-xs font-semibold leading-5 tabular-nums",
-                        foraDoMes ? "bg-muted text-muted-foreground" : "bg-primary text-primary-foreground",
+                  {(n > 0 || bl) && (
+                    <span className="flex items-center gap-0.5">
+                      {n > 0 && (
+                        <span
+                          className={cn(
+                            "min-w-6 rounded-full px-1.5 text-xs font-semibold leading-5 tabular-nums",
+                            foraDoMes ? "bg-muted text-muted-foreground" : "bg-primary text-primary-foreground",
+                          )}
+                        >
+                          {n}
+                        </span>
                       )}
-                    >
-                      {n}
+                      {bl && <Lock className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={2.5} aria-hidden />}
                     </span>
                   )}
                 </button>
@@ -269,13 +305,14 @@ function Page() {
             <div className="grid flex-1 grid-cols-7 gap-1">
               {dias.map((d) => {
                 const sel = d === dia;
+                const bl = bloqPorDia.get(d);
                 return (
                   <button
                     key={d}
                     type="button"
                     onClick={() => setDia(d)}
                     aria-pressed={sel}
-                    aria-label={`${diaPorExtenso(d)}${d === hoje ? " (hoje)" : ""}${comAgenda.has(d) ? ", com agendamentos" : ""}`}
+                    aria-label={`${diaPorExtenso(d)}${d === hoje ? " (hoje)" : ""}${comAgenda.has(d) ? ", com agendamentos" : ""}${bl ? (bl.diaTodo ? ", dia bloqueado" : ", com horário bloqueado") : ""}`}
                     className={cn(
                       "flex h-16 flex-col items-center justify-center rounded-xl transition-transform duration-150 ease-out active:scale-[0.96] motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       sel ? "bg-primary text-primary-foreground shadow-soft" : "active:bg-muted",
@@ -284,13 +321,10 @@ function Page() {
                   >
                     <span className="text-[11px] uppercase tracking-wide">{diaSemanaCurto(d)}</span>
                     <span className="text-lg font-semibold leading-tight">{diaDoMes(d)}</span>
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "mt-0.5 size-1.5 rounded-full",
-                        comAgenda.has(d) ? (sel ? "bg-primary-foreground" : "bg-primary") : "bg-transparent",
-                      )}
-                    />
+                    <span aria-hidden className="mt-0.5 flex h-2.5 items-center justify-center gap-0.5">
+                      {comAgenda.has(d) && <span className={cn("size-1.5 rounded-full", sel ? "bg-primary-foreground" : "bg-primary")} />}
+                      {bl && <Lock className={cn("size-2.5", sel ? "text-primary-foreground" : "text-muted-foreground")} strokeWidth={3} />}
+                    </span>
                   </button>
                 );
               })}
@@ -305,56 +339,41 @@ function Page() {
               <h2 className="text-xl">{diaPorExtenso(dia)}</h2>
               <span className="shrink-0 text-sm text-muted-foreground">{inicioExp}–{fimExp}</span>
             </div>
+            {bloqDiaTodo.map((b) => <FaixaDiaBloqueado key={b.id} b={b} onClick={() => setBloqueioAberto(b)} />)}
             <Button size="xl" onClick={() => { setEditing(null); setClienteInicial(undefined); setSerieInicial(false); setFormOpen(true); }}>
               <Plus /> Agendar
             </Button>
 
             {!isLoading && <PainelDoDia dia={dia} atendimentos={doDia} dona={cfg?.nome_dona ?? "Simone"} />}
 
-            {isLoading ? <Empty>Carregando...</Empty> : doDia.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 rounded-2xl bg-rose-gradient px-5 py-10 text-center">
-                <CalendarDays className="size-8 text-primary" aria-hidden />
-                <p className="font-semibold">Dia livre por enquanto</p>
-                <p className="text-sm text-muted-foreground">Toque em “Agendar” para marcar uma cliente.</p>
-              </div>
+            {isLoading ? <Empty>Carregando...</Empty> : linhas.length === 0 ? (
+              bloqDiaTodo.length > 0 ? null : (
+                <div className="flex flex-col items-center gap-2 rounded-2xl bg-rose-gradient px-5 py-10 text-center">
+                  <CalendarDays className="size-8 text-primary" aria-hidden />
+                  <p className="font-semibold">Dia livre por enquanto</p>
+                  <p className="text-sm text-muted-foreground">Toque em “Agendar” para marcar uma cliente ou bloquear um horário.</p>
+                </div>
+              )
             ) : (
               <ul className="space-y-3">
-                {doDia.map((a) => (
-                  <li key={a.id}>
-                    <button
-                      type="button"
-                      onClick={() => setAcoes(a)}
-                      className={cn(
-                        "w-full rounded-2xl border border-l-4 bg-card px-4 py-3 text-left transition-transform duration-150 ease-out active:scale-[0.98] active:bg-muted motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                        STATUS[a.status].borda,
-                        !ativo(a) && "opacity-50",
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold tabular-nums">{intervalo(a)}</span>
-                        <SeloSerie a={a} membros={membrosDe(a)} />
-                        <span className={cn("ml-auto shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold", STATUS[a.status].badge)}>
-                          {STATUS[a.status].label}
-                        </span>
-                      </div>
-                      <div className="mt-1 flex items-baseline justify-between gap-3">
-                        <span className={cn("min-w-0 truncate text-lg font-semibold", !ativo(a) && "line-through")}>
-                          {a.clientes?.nome ?? "—"}
-                        </span>
-                        <span className="shrink-0 font-semibold tabular-nums">{brl(a.valor_bruto)}</span>
-                      </div>
-                      <div className="line-clamp-2 text-sm text-muted-foreground">{nomesItens(a.itens)}</div>
-                      {a.status === "realizado" && recebedoresLabel(a.pagamentos, cfg?.nome_dona ?? "Simone") && (
-                        <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                          <span aria-hidden className="size-2 rounded-[3px] bg-parte-dona" />
-                          {recebedoresLabel(a.pagamentos, cfg?.nome_dona ?? "Simone")}
-                        </div>
-                      )}
-                    </button>
+                {linhas.map((l) => l.tipo === "b" ? (
+                  <li key={l.b.id}>
+                    <CartaoBloqueio b={l.b} onClick={() => setBloqueioAberto(l.b)} />
+                  </li>
+                ) : (
+                  <li key={l.a.id}>
+                    <CartaoAgendamento
+                      a={l.a}
+                      membros={membrosDe(l.a)}
+                      dona={cfg?.nome_dona ?? "Simone"}
+                      bloqueio={noBloqueio(l.a)}
+                      onClick={() => setAcoes(l.a)}
+                    />
                   </li>
                 ))}
               </ul>
             )}
+
           </div>
         </>
       )}
@@ -371,6 +390,15 @@ function Page() {
               </DrawerHeader>
               <div className="space-y-3 overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
                 <QuadroSerie a={acoes} membros={membrosDe(acoes)} />
+                {(() => {
+                  const b = noBloqueio(acoes);
+                  return b ? (
+                    <p className="flex gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                      <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
+                      Ficou dentro de um bloqueio ({horarioDoBloqueio(b)} · {tituloBloqueio(b)}). Remarque se precisar.
+                    </p>
+                  ) : null;
+                })()}
                 {acoes.status === "agendado" && <AvisoSaude cliente={clientes.find((c) => c.id === acoes.cliente_id)} />}
                 {acoes.status === "agendado" && (
                   <>
@@ -456,9 +484,62 @@ function Page() {
       </AlertDialog>
 
       <AgendaForm open={formOpen} onOpenChange={setFormOpen} editing={editing} dia={dia} horaSugerida={horaSugerida} clienteInicial={clienteInicial} serieInicial={serieInicial} />
+      <BloqueioAcoes bloqueio={bloqueioAberto} onClose={() => setBloqueioAberto(null)} agendamentos={semana} />
       <ConcluirForm atendimento={concluir} onClose={() => setConcluir(null)} />
       <AtendimentoForm open={!!editRealizado} onOpenChange={(o) => !o && setEditRealizado(null)} editing={editRealizado} />
     </>
+  );
+}
+
+/** Cartão de um agendamento na lista do dia. */
+function CartaoAgendamento({
+  a, membros, dona, bloqueio, onClick,
+}: {
+  a: Atendimento;
+  membros: Membro[];
+  dona: string;
+  /** Bloqueio em que este agendado ficou (marcado antes do bloqueio). */
+  bloqueio: Bloqueio | null;
+  onClick: () => void;
+}) {
+  const recebedores = a.status === "realizado" ? recebedoresLabel(a.pagamentos, dona) : "";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "w-full rounded-2xl border border-l-4 bg-card px-4 py-3 text-left transition-transform duration-150 ease-out active:scale-[0.98] active:bg-muted motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        STATUS[a.status].borda,
+        !ativo(a) && "opacity-50",
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <span className="font-semibold tabular-nums">{intervalo(a)}</span>
+        <SeloSerie a={a} membros={membros} />
+        <span className={cn("ml-auto shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold", STATUS[a.status].badge)}>
+          {STATUS[a.status].label}
+        </span>
+      </div>
+      <div className="mt-1 flex items-baseline justify-between gap-3">
+        <span className={cn("min-w-0 truncate text-lg font-semibold", !ativo(a) && "line-through")}>
+          {a.clientes?.nome ?? "—"}
+        </span>
+        <span className="shrink-0 font-semibold tabular-nums">{brl(a.valor_bruto)}</span>
+      </div>
+      <div className="line-clamp-2 text-sm text-muted-foreground">{nomesItens(a.itens)}</div>
+      {recebedores && (
+        <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <span aria-hidden className="size-2 rounded-[3px] bg-parte-dona" />
+          {recebedores}
+        </div>
+      )}
+      {bloqueio && (
+        <div className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-500">
+          <Lock className="size-3 shrink-0" aria-hidden />
+          <span className="truncate">No bloqueio · {tituloBloqueio(bloqueio)}</span>
+        </div>
+      )}
+    </button>
   );
 }
 
@@ -541,6 +622,12 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
   const oferecerRetorno = !!atendimento && !carregandoFuturos && !jaTem;
   const agendarRetorno = oferecerRetorno && retorno;
 
+  // Datas do retorno que caem num bloqueio ficam de fora (a primeira não pode cair).
+  const datasRetorno = gerarDatas(inicio, intervalo, vezes);
+  const duracaoRetorno = limitarDuracao(duracao).duracao;
+  const { data: bloqRetorno = [] } = useBloqueiosNasDatas(datasRetorno, agendarRetorno);
+  const bloqueadasRetorno = datasBloqueadas(datasRetorno, horaRetorno, duracaoRetorno, bloqRetorno);
+
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     if (!atendimento) return;
@@ -549,6 +636,10 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
     const pg = validarPagamentos(partes, somaItens(v.itens).valor);
     if ("erro" in pg) return void toast.error(pg.erro);
     if (agendarRetorno && !horaRetorno) return void toast.error("Informe a hora do retorno.");
+    const primeiraBloqueada = agendarRetorno ? bloqueadasRetorno.get(datasRetorno[0] ?? "") : undefined;
+    if (primeiraBloqueada) {
+      return void toast.error(`O retorno cai num bloqueio: ${textoImpedimento(primeiraBloqueada)}. Troque a hora ou toque em outro dia no calendário.`);
+    }
     setSaving(true);
     try {
       // O total vem da soma dos itens; o líquido, das taxas de cada parte (calculados no banco).
@@ -569,7 +660,7 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
     }
 
     if (agendarRetorno) {
-      const datas = gerarDatas(inicio, intervalo, vezes).filter((d) => !puladas.has(d));
+      const datas = datasRetorno.filter((d) => !puladas.has(d) && !bloqueadasRetorno.has(d));
       try {
         const ids = await criarAgendamentosRecorrentes({
           clienteId: atendimento.cliente_id, datas, hora: horaRetorno, duracao, observacoes: "", itens: v.itens, intervaloDias: intervalo,
@@ -577,12 +668,13 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
         toast.success(
           ids.length === 1
             ? `Retorno agendado para ${datas[0]!.slice(8, 10)}/${datas[0]!.slice(5, 7)} às ${horaRetorno}`
-            : `${plural(ids.length, "retorno agendado", "retornos agendados")} · a cada ${intervalo} dias`,
+            : `${plural(ids.length, "retorno agendado", "retornos agendados")} · ${intervalo === 1 ? "todo dia" : `a cada ${intervalo} dias`}`,
         );
         qc.invalidateQueries({ queryKey: ["clientes"] });
       } catch (err) {
         console.error(err);
-        toast.error("Atendimento concluído, mas o retorno não foi agendado.");
+        const motivo = mensagemErro(err, "");
+        toast.error(`Atendimento concluído, mas o retorno não foi agendado${motivo ? `: ${motivo}.` : "."}`);
       }
     }
     setSaving(false);
@@ -640,6 +732,7 @@ function ConcluirForm({ atendimento, onClose }: { atendimento: Atendimento | nul
                     onPuladas={setPuladas}
                     hoje={hoje}
                     textoVezes="1 = só o próximo"
+                    bloqueadas={bloqueadasRetorno}
                   />
                 </>
               )}

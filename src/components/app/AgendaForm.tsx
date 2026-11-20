@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, Repeat, Trash2, UserPlus } from "lucide-react";
+import { AlertTriangle, CalendarPlus, Lock, Repeat, Trash2, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import {
@@ -18,14 +18,18 @@ import { ClienteForm, emptyCliente } from "./ClienteForm";
 import { ServicosPicker } from "./ServicosPicker";
 import { RecorrenciaPicker } from "./RecorrenciaPicker";
 import { RemarcarSerie } from "./RemarcarSerie";
+import { BloqueioForm } from "./BloqueioForm";
 import { useRemarcacaoSerie, type ModoSerie } from "./useRemarcacaoSerie";
 import {
   STATUS_ATIVOS, criarAgendamentosRecorrentes, remarcarProximosDaSerie, salvarAtendimentoComItens, useAgenda,
-  useClientes, useConfig, useMembrosSeries, type Atendimento, type Cliente,
+  useBloqueios, useBloqueiosNasDatas, useClientes, useConfig, useMembrosSeries, type Atendimento, type Cliente,
 } from "@/lib/data";
 import { brl, hojeISO, horaAgora, horaHM, minutos } from "@/lib/format";
 import { itensParaForm, limitarDuracao, totaisForm, validarItens, type ItemForm } from "@/lib/itens";
 import { horariosLivres } from "@/lib/agenda";
+import {
+  bloqueioQueImpede, datasBloqueadas, diaInteiro, horarioDoBloqueio, textoImpedimento, tituloBloqueio, type Bloqueio,
+} from "@/lib/bloqueios";
 import { INTERVALO_PADRAO, conflitosDasDatas, gerarDatas, proximosDaSerie, type Ocupado } from "@/lib/recorrencia";
 import { mensagemErro } from "@/lib/erros";
 import { plural } from "@/lib/texto";
@@ -52,6 +56,10 @@ export function AvisoSaude({ cliente }: { cliente: Cliente | undefined }) {
 }
 
 const VEZES_PADRAO = 4;
+const SEM_BLOQUEIOS = new Map<string, Bloqueio>();
+
+/** "Horário bloqueado em 20/11, das 14:00 às 15:00 (Consulta). Escolha outro horário." */
+const avisoImpedimento = (b: Bloqueio) => `${textoImpedimento(b)}. Escolha outro ${diaInteiro(b) ? "dia" : "horário"}.`;
 
 export function AgendaForm({
   open, onOpenChange, editing, dia, horaSugerida, clienteInicial, serieInicial = false,
@@ -78,6 +86,8 @@ export function AgendaForm({
   const [confirmDel, setConfirmDel] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  // Novo: agendamento ou bloqueio de horário (como na outra agenda do salão).
+  const [tipo, setTipo] = useState<"agendamento" | "bloqueio">("agendamento");
 
   // Repetir (só em novo agendamento)
   const [repetir, setRepetir] = useState(false);
@@ -94,6 +104,7 @@ export function AgendaForm({
 
   useEffect(() => {
     if (!open) return;
+    setTipo("agendamento");
     setNovoCliente(false);
     setRepetir(false);
     setVezes(VEZES_PADRAO);
@@ -129,6 +140,7 @@ export function AgendaForm({
 
   const { data: cfg } = useConfig();
   const { data: doDiaForm, isLoading: carregandoDia } = useAgenda(data || dia, data || dia);
+  const { data: bloqDia = [] } = useBloqueios(data || dia, data || dia);
   const livres =
     data && Number.isInteger(dur) && dur >= 15 && dur <= 480
       ? horariosLivres({
@@ -138,10 +150,24 @@ export function AgendaForm({
           duracao: dur,
           ignorarId: editing?.id,
           agora: data === hoje ? horaAgora() : null,
+          bloqueios: bloqDia,
         })
       : [];
 
-  const datasSerie = repetir && !editing ? gerarDatas(data, intervalo, vezes).filter((d) => !puladas.has(d)) : [data];
+  // Bloqueio: o banco recusa 'agendado' novo ou que mude de lugar para dentro de um bloqueio.
+  // Quem já estava dentro de um bloqueio pode ficar (e se ajustar nele). Cancelado/falta não confere.
+  const conferirBloqueio = !editing || editing.status === "agendado";
+  const lugarAntes = editing ? { data: editing.data, hora: editing.hora, duracao: editing.duracao_min } : null;
+  const impede = conferirBloqueio && data ? bloqueioQueImpede(bloqDia, { data, hora, duracao: dur }, lugarAntes) : null;
+  const jaDentro = !impede && editing?.status === "agendado" ? bloqueioQueImpede(bloqDia, { data, hora, duracao: dur }) : null;
+  const diaBloqueado = bloqDia.find(diaInteiro) ?? null;
+
+  // Série nova: datas que caem num bloqueio ficam de fora (como se fossem puladas).
+  const serieNova = repetir && !editing;
+  const todasSerie = serieNova ? gerarDatas(data, intervalo, vezes) : [data];
+  const { data: bloqSerie = [] } = useBloqueiosNasDatas(todasSerie, serieNova);
+  const bloqueadasSerie = serieNova ? datasBloqueadas(todasSerie, hora, dur, bloqSerie) : SEM_BLOQUEIOS;
+  const datasSerie = serieNova ? todasSerie.filter((d) => !puladas.has(d) && !bloqueadasSerie.has(d)) : [data];
 
   const remarcacao = useRemarcacaoSerie({
     ativo: !!editing && modoSerie === "proximos" && proximos.length > 0,
@@ -162,11 +188,27 @@ export function AgendaForm({
     const v = validarItens(itens);
     if ("erro" in v) return void toast.error(v.erro);
     if (!data || !hora) return void toast.error("Informe data e hora.");
+    if (impede) return void toast.error(avisoImpedimento(impede));
+    if (datasSerie.length === 0) return void toast.error("Nenhuma data para agendar.");
     if (levarProximos && remarcacao.passado) {
       return void toast.error("Algum dos próximos cairia numa data que já passou. Desmarque ou escolha outra data.");
     }
 
     setSaving(true);
+    // Confere os bloqueios de novo na hora de salvar (a tela pode estar desatualizada).
+    if (conferirBloqueio) {
+      const { data: bloqAgora, error: eBloq } = await supabase
+        .from("bloqueios")
+        .select("id, data, hora_inicio, hora_fim, descricao, serie_id")
+        .in("data", datasSerie);
+      // Sem a tabela (SQL ainda não aplicado) o banco também não trava: segue sem conferir.
+      const b = eBloq ? null : datasSerie.map((d) => bloqueioQueImpede(bloqAgora ?? [], { data: d, hora, duracao: dur }, lugarAntes)).find(Boolean);
+      if (b) {
+        setSaving(false);
+        qc.invalidateQueries({ queryKey: ["bloqueios"] });
+        return void toast.error(avisoImpedimento(b));
+      }
+    }
     const { data: ocupados, error } = await supabase
       .from("atendimentos")
       .select("id, data, hora, duracao_min, status")
@@ -210,7 +252,7 @@ export function AgendaForm({
         const ids = await criarAgendamentosRecorrentes({
           clienteId, datas: datasSerie, hora, duracao: totalDuracao, observacoes: obs.trim(), itens: v.itens, intervaloDias: intervalo,
         });
-        toast.success(`${plural(ids.length, "agendamento criado", "agendamentos criados")} · a cada ${intervalo} dias`);
+        toast.success(`${plural(ids.length, "agendamento criado", "agendamentos criados")} · ${intervalo === 1 ? "todo dia" : `a cada ${intervalo} dias`}`);
         qc.invalidateQueries({ queryKey: ["clientes"] });
       } else {
         const campos = { cliente_id: clienteId, data, hora, observacoes: obs.trim() || null };
@@ -238,7 +280,8 @@ export function AgendaForm({
             );
           } catch (err) {
             console.error(err);
-            toast.error(mensagemErro(err, "Este foi salvo, mas os próximos da série não mudaram. Tente de novo pelo próximo."));
+            const motivo = mensagemErro(err, "");
+            toast.error(`Este foi salvo, mas os próximos da série não mudaram${motivo ? `: ${motivo}.` : ". Tente de novo pelo próximo."}`);
           }
         }
       }
@@ -283,11 +326,33 @@ export function AgendaForm({
         <DrawerContent className="max-h-[92vh]">
           <DrawerHeader className="text-left">
             <DrawerTitle className="font-display text-2xl">
-              {novoCliente ? "Nova cliente" : editing ? "Editar agendamento" : "Agendar"}
+              {novoCliente ? "Nova cliente" : editing ? "Editar agendamento" : tipo === "bloqueio" ? "Bloquear horário" : "Agendar"}
             </DrawerTitle>
           </DrawerHeader>
           <div className="overflow-y-auto px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]">
-            {novoCliente ? (
+            {!editing && !novoCliente && (
+              <div className="mb-4 grid grid-cols-2 gap-1 rounded-2xl bg-muted p-1" role="radiogroup" aria-label="O que marcar">
+                {(["agendamento", "bloqueio"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    role="radio"
+                    aria-checked={tipo === t}
+                    onClick={() => setTipo(t)}
+                    className={cn(
+                      "flex h-11 items-center justify-center gap-2 rounded-xl text-base font-semibold transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.98] motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-4",
+                      tipo === t ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+                    )}
+                  >
+                    {t === "agendamento" ? <CalendarPlus aria-hidden /> : <Lock aria-hidden />}
+                    {t === "agendamento" ? "Agendamento" : "Bloqueio"}
+                  </button>
+                ))}
+              </div>
+            )}
+            {!editing && !novoCliente && tipo === "bloqueio" ? (
+              <BloqueioForm dia={data || dia} horaSugerida={hora || horaSugerida} editing={null} onPronto={() => onOpenChange(false)} />
+            ) : novoCliente ? (
               <div className="space-y-3">
                 <ClienteForm
                   compact
@@ -326,7 +391,12 @@ export function AgendaForm({
                 </div>
                 <div className="space-y-2">
                   <Label id="horarios-livres">Horários livres</Label>
-                  {itens.length === 0 ? (
+                  {diaBloqueado ? (
+                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Lock className="size-4 shrink-0" aria-hidden />
+                      Dia bloqueado{diaBloqueado.descricao?.trim() ? ` (${diaBloqueado.descricao.trim()})` : ""}.
+                    </p>
+                  ) : itens.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Escolha um serviço para ver os horários livres.</p>
                   ) : carregandoDia ? (
                     <p className="text-sm text-muted-foreground">Carregando horários…</p>
@@ -353,7 +423,28 @@ export function AgendaForm({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ag-hora">Hora</Label>
-                  <Input id="ag-hora" className="h-12 text-base" type="time" step={60} required value={hora} onChange={(e) => setHora(e.target.value)} />
+                  <Input
+                    id="ag-hora"
+                    className="h-12 text-base"
+                    type="time"
+                    step={60}
+                    required
+                    value={hora}
+                    onChange={(e) => setHora(e.target.value)}
+                    aria-invalid={!!impede}
+                    aria-describedby={impede ? "ag-bloqueio" : undefined}
+                  />
+                  {impede && (
+                    <p id="ag-bloqueio" role="alert" className="flex gap-2 rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2.5 text-sm font-medium text-destructive">
+                      <Lock className="mt-0.5 size-4 shrink-0" aria-hidden /> {avisoImpedimento(impede)}
+                    </p>
+                  )}
+                  {jaDentro && (
+                    <p className="flex gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                      <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
+                      Este horário ficou dentro de um bloqueio ({horarioDoBloqueio(jaDentro)} · {tituloBloqueio(jaDentro)}). Pode manter; remarque se precisar.
+                    </p>
+                  )}
                 </div>
 
                 {!editing && (
@@ -383,6 +474,7 @@ export function AgendaForm({
                           puladas={puladas}
                           onPuladas={setPuladas}
                           hoje={hoje}
+                          bloqueadas={bloqueadasSerie}
                         />
                       </>
                     )}
@@ -402,6 +494,7 @@ export function AgendaForm({
                     excluidos={excluidosSerie}
                     onExcluidos={setExcluidosSerie}
                     conflitos={remarcacao.conflitos}
+                    bloqueados={remarcacao.bloqueados}
                     conferindo={remarcacao.conferindo}
                     hoje={hoje}
                   />

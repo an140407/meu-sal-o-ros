@@ -181,6 +181,39 @@ export type Database = {
           },
         ]
       }
+      bloqueios: {
+        Row: {
+          created_at: string
+          data: string
+          descricao: string | null
+          hora_fim: string | null
+          hora_inicio: string | null
+          id: string
+          serie_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data: string
+          descricao?: string | null
+          hora_fim?: string | null
+          hora_inicio?: string | null
+          id?: string
+          serie_id?: string | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          data?: string
+          descricao?: string | null
+          hora_fim?: string | null
+          hora_inicio?: string | null
+          id?: string
+          serie_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           alergias: string | null

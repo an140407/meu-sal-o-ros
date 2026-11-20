@@ -53,7 +53,11 @@ describe("resumoSerie", () => {
   it("tira as puladas e conta conflitos só nas ativas", () => {
     const datas = ["a", "b", "c", "d"];
     const r = resumoSerie(datas, new Set(["b"]), new Map([["b", 1], ["d", 1]]));
-    expect(r).toEqual({ ativas: ["a", "c", "d"], primeira: "a", ultima: "d", conflitos: 1, puladas: 1 });
+    expect(r).toEqual({ ativas: ["a", "c", "d"], primeira: "a", ultima: "d", conflitos: 1, puladas: 1, bloqueadas: 0 });
+  });
+  it("datas bloqueadas ficam de fora e não contam como puladas nem como conflito", () => {
+    const r = resumoSerie(["a", "b", "c", "d"], new Set(["b"]), new Map([["c", 1]]), new Map([["b", 1], ["c", 1]]));
+    expect(r).toEqual({ ativas: ["a", "d"], primeira: "a", ultima: "d", conflitos: 0, puladas: 1, bloqueadas: 1 });
   });
 });
 
